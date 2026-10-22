@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -15,6 +14,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import workflowRoutes from './routes/workflow.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import usersRoutes from './routes/users.routes.js';
+import cyclesRoutes from './routes/cycles.routes.js';
 
 const app = express();
 
@@ -56,6 +56,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/cycles', cyclesRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

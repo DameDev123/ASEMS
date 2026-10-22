@@ -6,6 +6,7 @@ import AppLayout from './layouts/AppLayout.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
+import CyclesPage from './pages/CyclesPage.jsx';
 import {
   clearToken,
   getCurrentUser,
@@ -97,6 +98,11 @@ export default function App() {
             : <LoginPage user={user} onLogin={handleLogin} />
         }
       />
+ <Route
+  path="cycles"
+  element={<CyclesPage user={user} />}
+/>
+
 
       <Route
         element={
