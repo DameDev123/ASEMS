@@ -2,12 +2,11 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  Activity,
-  Bell,
   BookOpen,
   Building2,
   CalendarDays,
   ChartNoAxesCombined,
+  ChevronDown,
   ClipboardCheck,
   ClipboardList,
   FileText,
@@ -15,18 +14,18 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Search,
   Settings,
   ShieldCheck,
   Users,
-  ChevronDown,
   X,
 } from 'lucide-react';
 
-const navGroups = [
+const adminGroups = [
   {
     label: 'OVERVIEW',
-    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
+    items: [
+      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+    ],
   },
   {
     label: 'ORGANIZATION',
@@ -49,8 +48,85 @@ const navGroups = [
   {
     label: 'REPORTING',
     items: [
-      { label: 'Reports & workflow', to: '/reports', icon: ChartNoAxesCombined },
+      {
+        label: 'Reports & workflow',
+        to: '/reports',
+        icon: ChartNoAxesCombined,
+      },
       { label: 'Audit trail', to: '/audit', icon: ShieldCheck },
+    ],
+  },
+];
+
+const evaluationGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [
+      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'MY WORK',
+    items: [
+      { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
+    ],
+  },
+];
+
+
+
+
+
+const instructorGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [
+      {
+        label: 'Dashboard',
+        to: '/',
+        icon: LayoutDashboard,
+      },
+    ],
+  },
+  {
+    label: 'MY WORK',
+    items: [
+      {
+        label: 'My Evaluations',
+        to: '/my-evaluations',
+        icon: FileText,
+      },
+      {
+        label: 'My Results',
+        to: '/results',
+        icon: ChartNoAxesCombined,
+      },
+    ],
+  },
+];
+
+
+
+
+
+
+
+const managementGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [
+      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'EVALUATION',
+    items: [
+      { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
+      {
+        label: 'Reports & workflow',
+        to: '/reports',
+        icon: ChartNoAxesCombined,
+      },
     ],
   },
 ];
@@ -79,13 +155,43 @@ function formatRole(role) {
     .join(' ');
 }
 
+
+
+
+function getNavigationGroups(role) {
+  switch (role) {
+    case 'admin':
+      return adminGroups;
+
+    case 'teacher':
+      return instructorGroups;
+
+    case 'department_head':
+    case 'committee':
+    case 'dean':
+    case 'management':
+      return managementGroups;
+
+    case 'student':
+    default:
+      return evaluationGroups;
+  }
+}
+
+
 export default function AppLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  function handleLogout() {
-    setProfileOpen(false);
+  const navigationGroups = getNavigationGroups(user?.role);
+
+  function closeMenus() {
     setMobileOpen(false);
+    setProfileOpen(false);
+  }
+
+  function handleLogout() {
+    closeMenus();
     onLogout?.();
   }
 
@@ -112,7 +218,9 @@ export default function AppLayout({ user, onLogout }) {
 
           <div>
             <div className="text-lg font-semibold tracking-wide">ASEMS</div>
-            <div className="text-[11px] text-slate-300">AMBO UNIVERSITY</div>
+            <div className="text-[11px] text-slate-300">
+              AMBO UNIVERSITY
+            </div>
           </div>
 
           <button
@@ -129,7 +237,7 @@ export default function AppLayout({ user, onLogout }) {
           className="scrollbar-thin flex-1 space-y-7 overflow-y-auto px-3 py-6"
           aria-label="Main navigation"
         >
-          {navGroups.map((group) => (
+          {navigationGroups.map((group) => (
             <section key={group.label}>
               <h2 className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
                 {group.label}
@@ -177,7 +285,7 @@ export default function AppLayout({ user, onLogout }) {
 
           <div className="mt-3 rounded-xl bg-white/5 p-3">
             <div className="flex items-center gap-2 text-xs font-medium">
-              <Activity size={14} className="text-emerald-400" />
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
               ASEMS workspace
             </div>
             <p className="mt-1 text-[11px] leading-5 text-slate-400">
@@ -209,27 +317,14 @@ export default function AppLayout({ user, onLogout }) {
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            <label className="hidden h-10 w-56 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 md:flex">
-              <Search size={16} className="shrink-0 text-slate-400" />
-              <input
-                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-                placeholder="Search workspace..."
-                aria-label="Search workspace"
-              />
-              <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-400">
-                /
-              </kbd>
-            </label>
-
-            <button
-              type="button"
-              className="icon-button relative"
-              aria-label="Notifications"
-              title="Notifications"
-            >
-              <Bell size={18} />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-gold-500" />
-            </button>
+            <div className="hidden text-right md:block">
+              <p className="text-xs font-medium text-slate-500">
+                Signed in as
+              </p>
+              <p className="text-sm font-semibold text-slate-800">
+                {formatRole(user?.role)}
+              </p>
+            </div>
 
             <div className="hidden h-8 w-px bg-slate-200 sm:block" />
 
