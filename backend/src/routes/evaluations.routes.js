@@ -4,6 +4,7 @@ import { pool } from '../config/database.js';
 import { requireAuth } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 import { writeAudit } from '../utils/audit.js';
+import { scoreProblem } from '../utils/formContent.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -67,10 +68,12 @@ async function recomputeInstructorSummary(connection, cycleId, instructorId) {
 async function getOwnedAssignment(connection, assignmentId, userId, role) {
   const [rows] = await connection.execute(
     `SELECT a.id, a.cycle_id, a.form_id, a.instructor_id, a.evaluator_id, a.status AS assignment_status,
-            cy.status AS cycle_status, f.weight, f.evaluator_type
+            cy.status AS cycle_status, f.weight, f.evaluator_type,
+            a.form_version_id, fv.scale_min, fv.scale_max, fv.allow_na
        FROM evaluation_assignments a
        JOIN evaluation_cycles cy ON cy.id = a.cycle_id
        JOIN evaluation_forms f ON f.id = a.form_id
+       JOIN form_versions fv ON fv.id = a.form_version_id
       WHERE a.id = ? ${role === 'admin' ? '' : 'AND a.evaluator_id = ?'}
       LIMIT 1`,
     role === 'admin' ? [assignmentId] : [assignmentId, userId]
@@ -87,7 +90,7 @@ router.put('/:assignmentId/draft', asyncHandler(async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.sub), req.user.role);
+    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.id), req.user.role);
     if (!assignment) throw httpError(404, 'Assignment not found.', 'NOT_FOUND');
     if (assignment.cycle_status !== 'active') throw httpError(409, 'This evaluation cycle is not active.', 'CYCLE_NOT_ACTIVE');
 
@@ -99,14 +102,16 @@ router.put('/:assignmentId/draft', asyncHandler(async (req, res) => {
     const [allowedRows] = await connection.execute(
       `SELECT c.id FROM form_criteria c
        JOIN form_sections s ON s.id = c.section_id
-       WHERE s.form_id = ? AND s.id BETWEEN 1 AND 19 AND c.is_active = 1`,
-      [assignment.form_id]
+       WHERE s.form_version_id = ? AND c.is_active = 1`,
+      [assignment.form_version_id]
     );
     const allowedIds = new Set(allowedRows.map(row => Number(row.id)));
     const uniqueScores = new Map();
     for (const item of parsed.data.scores) {
       if (!allowedIds.has(item.criterionId)) throw httpError(400, `Criterion ${item.criterionId} does not belong to this evaluation form.`, 'INVALID_CRITERION');
       if (uniqueScores.has(item.criterionId)) throw httpError(400, 'A criterion may only be scored once.', 'DUPLICATE_CRITERION');
+      const scale = scoreProblem(item.score, assignment);
+      if (scale) throw httpError(400, scale, 'INVALID_SCORE');
       uniqueScores.set(item.criterionId, item.score);
     }
 
@@ -134,7 +139,7 @@ router.put('/:assignmentId/draft', asyncHandler(async (req, res) => {
       );
     }
     await connection.execute("UPDATE evaluation_assignments SET status = 'draft' WHERE id = ?", [assignmentId]);
-    await writeAudit(connection, { userId: Number(req.user.sub), action: 'evaluation_saved_draft', entityType: 'evaluation', entityId: evaluationId, details: { assignmentId, scoreCount: uniqueScores.size }, ipAddress: req.ip });
+    await writeAudit(connection, { userId: Number(req.user.id), action: 'evaluation_saved_draft', entityType: 'evaluation', entityId: evaluationId, details: { assignmentId, scoreCount: uniqueScores.size }, ipAddress: req.ip });
     await connection.commit();
     sendData(res, { evaluationId, assignmentId, status: 'draft', savedScores: uniqueScores.size }, 200);
   } catch (error) {
@@ -154,7 +159,7 @@ router.post('/:assignmentId/submit', asyncHandler(async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.sub), req.user.role);
+    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.id), req.user.role);
     if (!assignment) throw httpError(404, 'Assignment not found.', 'NOT_FOUND');
     if (assignment.cycle_status !== 'active') throw httpError(409, 'This evaluation cycle is not active.', 'CYCLE_NOT_ACTIVE');
 
@@ -163,8 +168,8 @@ router.post('/:assignmentId/submit', asyncHandler(async (req, res) => {
     if (!evaluation || !['draft', 'returned', 'rejected'].includes(evaluation.status)) throw httpError(409, 'Save a draft before submitting, or this evaluation has already been submitted.', 'NOT_SUBMITTABLE');
     const [criteriaRows] = await connection.execute(
       `SELECT c.id FROM form_criteria c JOIN form_sections s ON s.id = c.section_id
-       WHERE s.form_id = ? AND s.id BETWEEN 1 AND 19 AND c.is_active = 1`,
-      [assignment.form_id]
+       WHERE s.form_version_id = ? AND c.is_active = 1`,
+      [assignment.form_version_id]
     );
     const [scoreRows] = await connection.execute(
       'SELECT criterion_id, score, is_na FROM evaluation_scores WHERE evaluation_id = ?',
@@ -187,7 +192,7 @@ router.post('/:assignmentId/submit', asyncHandler(async (req, res) => {
     );
     await connection.execute("UPDATE evaluation_assignments SET status = 'submitted' WHERE id = ?", [assignmentId]);
     await recomputeInstructorSummary(connection, assignment.cycle_id, assignment.instructor_id);
-    await writeAudit(connection, { userId: Number(req.user.sub), action: 'evaluation_submitted', entityType: 'evaluation', entityId: evaluation.id, details: { assignmentId, average: Number(average.toFixed(3)), weightedScore: Number(weighted.toFixed(3)) }, ipAddress: req.ip });
+    await writeAudit(connection, { userId: Number(req.user.id), action: 'evaluation_submitted', entityType: 'evaluation', entityId: evaluation.id, details: { assignmentId, average: Number(average.toFixed(3)), weightedScore: Number(weighted.toFixed(3)) }, ipAddress: req.ip });
     await connection.commit();
     sendData(res, { evaluationId: evaluation.id, assignmentId, status: 'submitted', overallAverage: Number(average.toFixed(3)), weightedScore: Number(weighted.toFixed(3)), note: 'Component scores are recorded; the final instructor score is calculated only when all four component evaluations are submitted.' });
   } catch (error) {

@@ -15,7 +15,7 @@ router.get(
     const userId = Number(req.user.id);
 
     // The authentication middleware provides req.user.id.
-    // Never use req.user.sub here.
+    // Never use req.user.id here.
     const assignmentWhere = isAdmin
       ? ''
       : 'WHERE evaluator_id = ?';

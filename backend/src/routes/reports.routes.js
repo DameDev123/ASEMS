@@ -19,7 +19,7 @@ router.get('/summaries', allowRoles('admin', 'committee', 'department_head', 'de
       JOIN employees instructor_emp ON instructor_emp.department_id = viewer_emp.department_id
       WHERE viewer_emp.user_id = ? AND instructor_emp.user_id = s.instructor_id
     )`);
-    values.push(Number(req.user.sub));
+    values.push(Number(req.user.id));
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';

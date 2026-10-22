@@ -63,7 +63,7 @@ router.post('/:evaluationId/review', allowRoles('admin', ...stageRoles), asyncHa
 
     await connection.execute(
       'INSERT INTO evaluation_reviews (evaluation_id, reviewer_id, action, comment) VALUES (?, ?, ?, ?)',
-      [evaluationId, Number(req.user.sub), parsed.data.action, parsed.data.comment ?? null]
+      [evaluationId, Number(req.user.id), parsed.data.action, parsed.data.comment ?? null]
     );
 
     let nextStatus = 'submitted';
@@ -86,11 +86,11 @@ router.post('/:evaluationId/review', allowRoles('admin', ...stageRoles), asyncHa
         await connection.execute(
           `UPDATE evaluation_summaries SET status = 'reviewed', finalized_by = ?, finalized_at = NOW()
            WHERE cycle_id = ? AND instructor_id = ? AND status = 'complete'`,
-          [Number(req.user.sub), evaluation.cycle_id, evaluation.instructor_id]
+          [Number(req.user.id), evaluation.cycle_id, evaluation.instructor_id]
         );
       }
     }
-    await writeAudit(connection, { userId: Number(req.user.sub), action: `evaluation_${parsed.data.action}`, entityType: 'evaluation', entityId: evaluationId, details: { stage: requiredRole ?? 'admin', comment: parsed.data.comment ?? null }, ipAddress: req.ip });
+    await writeAudit(connection, { userId: Number(req.user.id), action: `evaluation_${parsed.data.action}`, entityType: 'evaluation', entityId: evaluationId, details: { stage: requiredRole ?? 'admin', comment: parsed.data.comment ?? null }, ipAddress: req.ip });
     await connection.commit();
     sendData(res, { evaluationId, status: nextStatus, approvalsCompleted: parsed.data.action === 'approved' ? approvals + 1 : approvals });
   } catch (error) {

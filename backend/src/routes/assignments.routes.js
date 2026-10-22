@@ -8,7 +8,7 @@ router.use(requireAuth);
 
 const assignmentSelect = `
   SELECT a.id, a.cycle_id, cy.title AS cycle_title, cy.academic_year, cy.status AS cycle_status,
-         a.form_id, f.code AS form_code, f.title AS form_title, f.evaluator_type, f.weight,
+         a.form_id, a.form_version_id, f.code AS form_code, f.title AS form_title, f.evaluator_type, f.weight,
          a.instructor_id, instructor.name AS instructor_name,
          a.evaluator_id, evaluator.name AS evaluator_name,
          a.course_title, a.course_code, a.batch, a.semester, a.status,

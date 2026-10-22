@@ -15,7 +15,8 @@ import workflowRoutes from './routes/workflow.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import usersRoutes from './routes/users.routes.js';
 import cyclesRoutes from './routes/cycles.routes.js';
-
+import tasksRoutes from './routes/tasks.routes.js';
+import resultsRoutes from './routes/results.routes.js';
 const app = express();
 
 app.disable('x-powered-by');
@@ -57,7 +58,8 @@ app.use('/api/workflow', workflowRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/cycles', cyclesRoutes);
-
+app.use('/api/tasks', tasksRoutes);
+app.use('/api/results', resultsRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
