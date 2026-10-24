@@ -23,9 +23,7 @@ import {
 const adminGroups = [
   {
     label: 'OVERVIEW',
-    items: [
-      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-    ],
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
   },
   {
     label: 'ORGANIZATION',
@@ -53,6 +51,14 @@ const adminGroups = [
         to: '/reports',
         icon: ChartNoAxesCombined,
       },
+
+
+      {
+  label: 'Final Evaluation Report',
+  to: '/final-report',
+  icon: FileText,
+},
+
       { label: 'Audit trail', to: '/audit', icon: ShieldCheck },
     ],
   },
@@ -61,23 +67,33 @@ const adminGroups = [
 const evaluationGroups = [
   {
     label: 'OVERVIEW',
-    items: [
-      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-    ],
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
+  },
+  {
+    label: 'MY WORK',
+    items: [{ label: 'My evaluations', to: '/my-evaluations', icon: FileText }],
+  },
+];
+
+const instructorGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
   },
   {
     label: 'MY WORK',
     items: [
-      { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
+      { label: 'My Evaluations', to: '/my-evaluations', icon: FileText },
+      {
+        label: 'My Results',
+        to: '/my-results',
+        icon: ChartNoAxesCombined,
+      },
     ],
   },
 ];
 
-
-
-
-
-const instructorGroups = [
+const managementGroups = [
   {
     label: 'OVERVIEW',
     items: [
@@ -89,47 +105,28 @@ const instructorGroups = [
     ],
   },
   {
-    label: 'MY WORK',
+    label: 'EVALUATION',
     items: [
       {
-        label: 'My Evaluations',
+        label: 'My evaluations',
         to: '/my-evaluations',
         icon: FileText,
       },
-      {
-        label: 'My Results',
-        to: '/results',
-        icon: ChartNoAxesCombined,
-      },
-    ],
-  },
-];
-
-
-
-
-
-
-
-const managementGroups = [
-  {
-    label: 'OVERVIEW',
-    items: [
-      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: 'EVALUATION',
-    items: [
-      { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
       {
         label: 'Reports & workflow',
         to: '/reports',
         icon: ChartNoAxesCombined,
       },
+      {
+        label: 'Final Evaluation Report',
+        to: '/final-report',
+        icon: FileText,
+      },
     ],
   },
 ];
+
+
 
 function getInitials(user) {
   const name = user?.name?.trim();
@@ -155,9 +152,6 @@ function formatRole(role) {
     .join(' ');
 }
 
-
-
-
 function getNavigationGroups(role) {
   switch (role) {
     case 'admin':
@@ -177,7 +171,6 @@ function getNavigationGroups(role) {
       return evaluationGroups;
   }
 }
-
 
 export default function AppLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);

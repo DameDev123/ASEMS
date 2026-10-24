@@ -4,6 +4,7 @@ import { pool } from '../config/database.js';
 import { requireAuth, allowRoles } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 import { writeAudit } from '../utils/audit.js';
+import { recomputeInstructorSummary } from '../services/summaryService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -72,27 +73,14 @@ router.post('/:evaluationId/review', allowRoles('admin', ...stageRoles), asyncHa
     if (parsed.data.action === 'approved' && approvals === stageRoles.length - 1) nextStatus = 'approved';
     await connection.execute('UPDATE evaluations SET status = ? WHERE id = ?', [nextStatus, evaluationId]);
 
-    if (nextStatus === 'approved') {
-      const [summaryReadiness] = await connection.execute(
-        `SELECT COUNT(DISTINCT f.evaluator_type) AS component_types,
-                SUM(e.status <> 'approved') AS not_approved
-           FROM evaluations e
-           JOIN evaluation_assignments a ON a.id = e.assignment_id
-           JOIN evaluation_forms f ON f.id = a.form_id
-          WHERE a.cycle_id = ? AND a.instructor_id = ?`,
-        [evaluation.cycle_id, evaluation.instructor_id]
-      );
-      if (Number(summaryReadiness[0].component_types) === 4 && Number(summaryReadiness[0].not_approved) === 0) {
-        await connection.execute(
-          `UPDATE evaluation_summaries SET status = 'reviewed', finalized_by = ?, finalized_at = NOW()
-           WHERE cycle_id = ? AND instructor_id = ? AND status = 'complete'`,
-          [Number(req.user.id), evaluation.cycle_id, evaluation.instructor_id]
-        );
-      }
-    }
+    // Every review action can change the result (a returned or rejected evaluation stops
+    // counting; the last approval releases it), so recalculate Form E inside this transaction.
+    const summary = await recomputeInstructorSummary(
+      connection, evaluation.cycle_id, evaluation.instructor_id, { finalizedBy: Number(req.user.id) }
+    );
     await writeAudit(connection, { userId: Number(req.user.id), action: `evaluation_${parsed.data.action}`, entityType: 'evaluation', entityId: evaluationId, details: { stage: requiredRole ?? 'admin', comment: parsed.data.comment ?? null }, ipAddress: req.ip });
     await connection.commit();
-    sendData(res, { evaluationId, status: nextStatus, approvalsCompleted: parsed.data.action === 'approved' ? approvals + 1 : approvals });
+    sendData(res, { evaluationId, status: nextStatus, approvalsCompleted: parsed.data.action === 'approved' ? approvals + 1 : approvals, summaryStatus: summary.status });
   } catch (error) {
     await connection.rollback();
     throw error;

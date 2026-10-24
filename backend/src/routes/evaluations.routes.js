@@ -5,6 +5,8 @@ import { requireAuth } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 import { writeAudit } from '../utils/audit.js';
 import { scoreProblem } from '../utils/formContent.js';
+import { SCORING_CONFIG, responseFromDbRow, roundTo, scoreEvaluation } from '../utils/evaluationSummary.js';
+import { recomputeInstructorSummary } from '../services/summaryService.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -21,49 +23,6 @@ const commentsSchema = z.object({
   commentStrengths: z.string().max(10000).optional().nullable(),
   commentImprovements: z.string().max(10000).optional().nullable(),
 });
-
-async function recomputeInstructorSummary(connection, cycleId, instructorId) {
-  const [rows] = await connection.execute(
-    `SELECT f.evaluator_type, f.weight, AVG(e.overall_average) AS component_average
-       FROM evaluations e
-       JOIN evaluation_assignments a ON a.id = e.assignment_id
-       JOIN evaluation_forms f ON f.id = a.form_id
-      WHERE a.cycle_id = ? AND a.instructor_id = ? AND e.status IN ('submitted', 'approved')
-      GROUP BY f.evaluator_type, f.weight`,
-    [cycleId, instructorId]
-  );
-  const byType = new Map(rows.map(row => [row.evaluator_type, {
-    average: Number(Number(row.component_average).toFixed(3)),
-    weighted: Number((Number(row.component_average) * Number(row.weight) / 5).toFixed(3)),
-  }]));
-  const required = ['student', 'department_head', 'peer', 'self'];
-  const complete = required.every(type => byType.has(type));
-  const student = byType.get('student');
-  const head = byType.get('department_head');
-  const peer = byType.get('peer');
-  const self = byType.get('self');
-  const total = complete ? required.reduce((sum, type) => sum + byType.get(type).weighted, 0) : 0;
-
-  await connection.execute(
-    `INSERT INTO evaluation_summaries
-      (cycle_id, instructor_id, student_average, student_weighted,
-       department_head_average, department_head_weighted, peer_average, peer_weighted,
-       self_average, self_weighted, total_score, status, finalized_by, finalized_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
-     ON DUPLICATE KEY UPDATE
-       student_average = VALUES(student_average), student_weighted = VALUES(student_weighted),
-       department_head_average = VALUES(department_head_average), department_head_weighted = VALUES(department_head_weighted),
-       peer_average = VALUES(peer_average), peer_weighted = VALUES(peer_weighted),
-       self_average = VALUES(self_average), self_weighted = VALUES(self_weighted),
-       total_score = VALUES(total_score), status = VALUES(status), finalized_by = NULL, finalized_at = NULL`,
-    [cycleId, instructorId,
-      student?.average ?? null, student?.weighted ?? 0,
-      head?.average ?? null, head?.weighted ?? 0,
-      peer?.average ?? null, peer?.weighted ?? 0,
-      self?.average ?? null, self?.weighted ?? 0,
-      Number(total.toFixed(3)), complete ? 'complete' : 'incomplete']
-  );
-}
 
 async function getOwnedAssignment(connection, assignmentId, userId, role) {
   const [rows] = await connection.execute(
@@ -166,35 +125,40 @@ router.post('/:assignmentId/submit', asyncHandler(async (req, res) => {
     const [evaluationRows] = await connection.execute('SELECT id, status FROM evaluations WHERE assignment_id = ? FOR UPDATE', [assignmentId]);
     const evaluation = evaluationRows[0];
     if (!evaluation || !['draft', 'returned', 'rejected'].includes(evaluation.status)) throw httpError(409, 'Save a draft before submitting, or this evaluation has already been submitted.', 'NOT_SUBMITTABLE');
+
     const [criteriaRows] = await connection.execute(
-      `SELECT c.id FROM form_criteria c JOIN form_sections s ON s.id = c.section_id
-       WHERE s.form_version_id = ? AND c.is_active = 1`,
+      `SELECT c.id, s.section_key AS sectionKey, s.title AS sectionTitle
+         FROM form_criteria c JOIN form_sections s ON s.id = c.section_id
+        WHERE s.form_version_id = ? AND c.is_active = 1
+        ORDER BY s.sort_order, s.id, c.sort_order, c.id`,
       [assignment.form_version_id]
     );
     const [scoreRows] = await connection.execute(
       'SELECT criterion_id, score, is_na FROM evaluation_scores WHERE evaluation_id = ?',
       [evaluation.id]
     );
-    const scoreMap = new Map(scoreRows.map(row => [Number(row.criterion_id), row]));
-    const missing = criteriaRows.filter(row => !scoreMap.has(Number(row.id)));
-    if (missing.length) throw httpError(400, `Complete every criterion before submitting. ${missing.length} response(s) are missing.`, 'INCOMPLETE_EVALUATION');
 
-    // NA responses are excluded from the mean. This is a provisional technical rule and must be confirmed institutionally.
-    const numeric = scoreRows.filter(row => !row.is_na && row.score !== null).map(row => Number(row.score));
-    if (!numeric.length) throw httpError(400, 'At least one numeric score is required.', 'NO_NUMERIC_SCORES');
-    const average = numeric.reduce((sum, score) => sum + score, 0) / numeric.length;
-    const weighted = average * Number(assignment.weight) / 5;
+    // One scoring rule for the whole system: see utils/evaluationSummary.js.
+    const result = scoreEvaluation(scoreRows.map(responseFromDbRow), criteriaRows);
+    if (!result.ok) {
+      const missing = result.issues.filter(issue => issue.code === 'MISSING_RESPONSE').length;
+      if (missing) throw httpError(400, `Complete every criterion before submitting. ${missing} response(s) are missing.`, 'INCOMPLETE_EVALUATION');
+      if (result.issues[0]?.code === 'NO_SCORED_CRITERIA') throw httpError(400, 'At least one numeric score is required.', 'NO_NUMERIC_SCORES');
+      throw httpError(400, result.issues[0]?.message ?? 'The evaluation could not be scored.', 'INVALID_EVALUATION');
+    }
+    const average = roundTo(result.overall.average);
+    const weighted = roundTo(Number(assignment.weight) * result.overall.sum / (SCORING_CONFIG.scaleMax * result.overall.counted));
 
     await connection.execute(
       `UPDATE evaluations SET status = 'submitted', comment_strengths = ?, comment_improvements = ?,
        overall_average = ?, weighted_score = ?, submitted_at = NOW() WHERE id = ?`,
-      [parsed.data.commentStrengths ?? null, parsed.data.commentImprovements ?? null, average.toFixed(3), weighted.toFixed(3), evaluation.id]
+      [parsed.data.commentStrengths ?? null, parsed.data.commentImprovements ?? null, average, weighted, evaluation.id]
     );
     await connection.execute("UPDATE evaluation_assignments SET status = 'submitted' WHERE id = ?", [assignmentId]);
     await recomputeInstructorSummary(connection, assignment.cycle_id, assignment.instructor_id);
-    await writeAudit(connection, { userId: Number(req.user.id), action: 'evaluation_submitted', entityType: 'evaluation', entityId: evaluation.id, details: { assignmentId, average: Number(average.toFixed(3)), weightedScore: Number(weighted.toFixed(3)) }, ipAddress: req.ip });
+    await writeAudit(connection, { userId: Number(req.user.id), action: 'evaluation_submitted', entityType: 'evaluation', entityId: evaluation.id, details: { assignmentId, average, weightedScore: weighted }, ipAddress: req.ip });
     await connection.commit();
-    sendData(res, { evaluationId: evaluation.id, assignmentId, status: 'submitted', overallAverage: Number(average.toFixed(3)), weightedScore: Number(weighted.toFixed(3)), note: 'Component scores are recorded; the final instructor score is calculated only when all four component evaluations are submitted.' });
+    sendData(res, { evaluationId: evaluation.id, assignmentId, status: 'submitted', overallAverage: average, weightedScore: weighted, note: 'Component scores are recorded; the final instructor score is calculated only when all four component evaluations are submitted.' });
   } catch (error) {
     await connection.rollback();
     throw error;

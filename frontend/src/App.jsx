@@ -1,6 +1,11 @@
 
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from 'react-router-dom';
 
 import AppLayout from './layouts/AppLayout.jsx';
 
@@ -12,6 +17,7 @@ import TasksPage from './pages/TasksPage.jsx';
 import MyEvaluationsPage from './pages/MyEvaluationsPage.jsx';
 import MyResultsPage from './pages/MyResultsPage.jsx';
 import ReportsWorkflowPage from './pages/ReportsWorkflowPage.jsx';
+import FinalEvaluationReportPage from './pages/FinalEvaluationReportPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 import {
@@ -20,13 +26,11 @@ import {
   getToken,
 } from './services/api.js';
 
-const pages = [
-  {
-    path: 'users',
-    title: 'Users & roles',
-    description:
-      'Manage accounts and permission assignments with server-side authorization.',
-  },
+/**
+ * Pages that have not yet been implemented.
+ * Replace these placeholders when their real page components exist.
+ */
+const placeholderPages = [
   {
     path: 'departments',
     title: 'Departments',
@@ -43,43 +47,13 @@ const pages = [
     path: 'academic',
     title: 'Courses & instructors',
     description:
-      'Manage course and instructor records and their approved assignments.',
-  },
-  {
-    path: 'cycles',
-    title: 'Evaluation cycles',
-    description:
-      'Configure evaluation periods, deadlines, and completion tracking.',
+      'Manage course and instructor records and approved assignments.',
   },
   {
     path: 'forms',
     title: 'Official evaluation forms',
     description:
-      'Configure evaluation criteria and sections from the official university forms.',
-  },
-  {
-    path: 'tasks',
-    title: 'Evaluation tasks',
-    description:
-      'Assign eligible evaluators and track required component submissions.',
-  },
-  {
-    path: 'my-evaluations',
-    title: 'My evaluations',
-    description:
-      'View assigned forms and submit evaluations securely.',
-  },
-  {
-    path: 'my-results',
-    title: 'My results',
-    description:
-      'View your released evaluation scores.',
-  },
-  {
-    path: 'reports',
-    title: 'Reports & workflow',
-    description:
-      "Route summary reports through Committee → Department Head → College → VP's Office.",
+      'Configure evaluation criteria and sections from official university forms.',
   },
   {
     path: 'audit',
@@ -91,15 +65,36 @@ const pages = [
     path: 'settings',
     title: 'Settings',
     description:
-      'Configure approved system options and user profile preferences.',
+      'Configure approved system options and profile preferences.',
   },
 ];
 
+/**
+ * All implemented pages.
+ * Keep these paths consistent with AppLayout navigation links.
+ */
+const implementedPages = {
+  users: UsersPage,
+  cycles: CyclesPage,
+  tasks: TasksPage,
+  'my-evaluations': MyEvaluationsPage,
+  'my-results': MyResultsPage,
+  reports: ReportsWorkflowPage,
+  'final-report': FinalEvaluationReportPage,
+};
+
 function LoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+    <div
+      className="flex min-h-screen items-center justify-center bg-slate-50"
+      role="status"
+      aria-live="polite"
+    >
       <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-navy-900" />
+        <span
+          className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-navy-900"
+          aria-hidden="true"
+        />
         Checking your session…
       </div>
     </div>
@@ -138,8 +133,21 @@ export default function App() {
       try {
         const result = await getCurrentUser();
 
-        if (active) {
-          setUser(result?.data?.user ?? null);
+        if (!active) {
+          return;
+        }
+
+        // Supports the API response shape used by this project.
+        const currentUser =
+          result?.data?.user ??
+          result?.user ??
+          null;
+
+        setUser(currentUser);
+
+        // A token without a valid user is not a valid restored session.
+        if (!currentUser) {
+          clearToken();
         }
       } catch {
         clearToken();
@@ -162,13 +170,19 @@ export default function App() {
   }, []);
 
   function handleLogin(authenticatedUser) {
+    if (!authenticatedUser) {
+      return;
+    }
+
     setUser(authenticatedUser);
+    setLoading(false);
     navigate('/', { replace: true });
   }
 
   function handleLogout() {
     clearToken();
     setUser(null);
+    setLoading(false);
     navigate('/login', { replace: true });
   }
 
@@ -179,8 +193,13 @@ export default function App() {
         element={
           loading ? (
             <LoadingScreen />
+          ) : user ? (
+            <Navigate to="/" replace />
           ) : (
-            <LoginPage user={user} onLogin={handleLogin} />
+            <LoginPage
+              user={user}
+              onLogin={handleLogin}
+            />
           )
         }
       />
@@ -196,29 +215,23 @@ export default function App() {
       >
         <Route index element={<DashboardPage />} />
 
-        {pages.map((page) => (
+        {Object.entries(implementedPages).map(([path, Page]) => (
+          <Route
+            key={path}
+            path={path}
+            element={<Page user={user} />}
+          />
+        ))}
+
+        {placeholderPages.map((page) => (
           <Route
             key={page.path}
             path={page.path}
             element={
-              page.path === 'users' ? (
-                <UsersPage user={user} />
-              ) : page.path === 'cycles' ? (
-                <CyclesPage user={user} />
-              ) : page.path === 'tasks' ? (
-                <TasksPage user={user} />
-              ) : page.path === 'my-evaluations' ? (
-                <MyEvaluationsPage user={user} />
-              ) : page.path === 'my-results' ? (
-                <MyResultsPage user={user} />
-              ) : page.path === 'reports' ? (
-                <ReportsWorkflowPage user={user} />
-              ) : (
-                <PlaceholderPage
-                  title={page.title}
-                  description={page.description}
-                />
-              )
+              <PlaceholderPage
+                title={page.title}
+                description={page.description}
+              />
             }
           />
         ))}
