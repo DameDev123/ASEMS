@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import {
   Navigate,
@@ -18,6 +17,12 @@ import MyEvaluationsPage from './pages/MyEvaluationsPage.jsx';
 import MyResultsPage from './pages/MyResultsPage.jsx';
 import ReportsWorkflowPage from './pages/ReportsWorkflowPage.jsx';
 import FinalEvaluationReportPage from './pages/FinalEvaluationReportPage.jsx';
+import LeadershipFormsPage from './pages/LeadershipFormsPage.jsx';
+import LeadershipAssignmentsPage from './pages/LeadershipAssignmentsPage.jsx';
+import LeadershipEvaluationsPage from './pages/LeadershipEvaluationsPage.jsx';
+import OfficesPage from './pages/OfficesPage.jsx';
+import ReferralsPage from './pages/ReferralsPage.jsx';
+import ArchivePage from './pages/ArchivePage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 import {
@@ -81,6 +86,12 @@ const implementedPages = {
   'my-results': MyResultsPage,
   reports: ReportsWorkflowPage,
   'final-report': FinalEvaluationReportPage,
+  'leadership-forms': LeadershipFormsPage,
+  'leadership-assignments': LeadershipAssignmentsPage,
+  'leadership-evaluations': LeadershipEvaluationsPage,
+  offices: OfficesPage,
+  referrals: ReferralsPage,
+  archive: ArchivePage,
 };
 
 function LoadingScreen() {

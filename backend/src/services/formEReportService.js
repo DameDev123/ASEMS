@@ -164,7 +164,7 @@ export async function getFormESummary(connection, summaryId) {
   });
 
   const meta = assignmentMeta[0] ?? {};
-  const isFinal = FINAL_STATUSES.includes(summary.status) && form.complete;
+  const isFinal = FINAL_STATUSES.includes(summary.status) && form.state === 'approved';
   const storedTotal = Number(summary.total_score);
   const integrityMatches = form.total === null ? storedTotal === 0 : Math.abs(storedTotal - form.total) < 0.0005;
 
@@ -181,8 +181,8 @@ export async function getFormESummary(connection, summaryId) {
   if (form.excluded.length) {
     warnings.push(`${form.excluded.length} evaluation(s) are not counted because they are draft, returned or rejected.`);
   }
-  if (FINAL_STATUSES.includes(summary.status) && !form.complete) {
-    warnings.push('The stored summary is marked as final, but the live data is no longer complete. Do not treat this report as final.');
+  if (FINAL_STATUSES.includes(summary.status) && form.state !== 'approved') {
+    warnings.push('The stored summary is marked as final, but the live data is no longer fully approved. Do not treat this report as final.');
   }
   if (!integrityMatches) {
     warnings.push('The stored summary total differs from the live calculation. Run the summary refresh (scripts/recomputeSummaries.js) before relying on stored values.');

@@ -7,8 +7,10 @@ import { httpError } from '../utils/http.js';
 import { EVALUATOR_TYPES, OFFICIAL_WEIGHTS, SCORING_CONFIG, computeFormE } from '../utils/evaluationSummary.js';
 import { buildGroupsInput } from '../utils/formEInput.js';
 
-// Form E state -> evaluation_summaries.status
-const STATUS_BY_STATE = { incomplete: 'incomplete', complete: 'complete', approved: 'reviewed' };
+
+// Form E state -> evaluation_summaries.status. 'reviewed' (final) is never set here:
+// the committee or department head sets it by finalizing Form E with the final comments.
+const STATUS_BY_STATE = { incomplete: 'incomplete', complete: 'complete', approved: 'complete' };
 
 async function loadWeights(connection) {
   const [rows] = await connection.execute(
@@ -112,7 +114,12 @@ export async function recomputeInstructorSummary(connection, cycleId, instructor
   );
   if (existing[0]?.status === 'archived') return { form, written: false, status: 'archived' };
 
-  const status = STATUS_BY_STATE[form.state];
+
+  // A finalized summary stays final while every evaluation is still approved. If the data
+  // changes afterwards (a new evaluator, a returned form) it drops back and must be finalized again.
+  let status = STATUS_BY_STATE[form.state];
+  if (form.state === 'approved' && existing[0]?.status === 'reviewed') status = 'reviewed';
+
   const { student, department_head: head, peer, self } = form.groups;
 
   // A missing group keeps its average NULL; its weighted column holds 0 only

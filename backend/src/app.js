@@ -17,6 +17,10 @@ import usersRoutes from './routes/users.routes.js';
 import cyclesRoutes from './routes/cycles.routes.js';
 import tasksRoutes from './routes/tasks.routes.js';
 import resultsRoutes from './routes/results.routes.js';
+import leadershipRoutes from './routes/leadership.routes.js';
+import improvementRoutes from './routes/improvement.routes.js';
+import archiveRoutes from './routes/archive.routes.js';
+import lifecycleRoutes from './routes/lifecycle.routes.js';
 const app = express();
 
 app.disable('x-powered-by');
@@ -60,6 +64,10 @@ app.use('/api/users', usersRoutes);
 app.use('/api/cycles', cyclesRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/results', resultsRoutes);
+app.use('/api/leadership', leadershipRoutes);
+app.use('/api/improvement', improvementRoutes);
+app.use('/api/archive', archiveRoutes);
+app.use('/api/lifecycle', lifecycleRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

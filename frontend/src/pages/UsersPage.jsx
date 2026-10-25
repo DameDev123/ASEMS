@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../services/api.js';
 
@@ -10,6 +9,9 @@ const ROLES = [
   'dean',
   'committee',
   'management',
+  'academic_vp',
+  'archives',
+  'concerned_office',
 ];
 
 const STATUSES = ['active', 'inactive', 'suspended'];

@@ -1,4 +1,3 @@
-
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { pool } from '../config/database.js';
@@ -12,6 +11,9 @@ const ROLES = [
   'dean',
   'committee',
   'management',
+  'academic_vp',
+  'archives',
+  'concerned_office',
 ];
 
 const STATUSES = ['active', 'inactive', 'suspended'];

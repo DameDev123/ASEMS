@@ -1,10 +1,10 @@
-
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   BookOpen,
   Building2,
   CalendarDays,
+  Archive,
   ChartNoAxesCombined,
   ChevronDown,
   ClipboardCheck,
@@ -15,7 +15,9 @@ import {
   LogOut,
   Menu,
   Settings,
+  Share2,
   ShieldCheck,
+  UserCheck,
   Users,
   X,
 } from 'lucide-react';
@@ -41,6 +43,21 @@ const adminGroups = [
       { label: 'Official forms', to: '/forms', icon: ClipboardList },
       { label: 'Evaluation tasks', to: '/tasks', icon: ClipboardCheck },
       { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
+    ],
+  },
+  {
+    label: 'LEADERSHIP',
+    items: [
+      { label: 'Leadership forms', to: '/leadership-forms', icon: ClipboardList },
+      { label: 'Leadership evaluations', to: '/leadership-assignments', icon: UserCheck },
+    ],
+  },
+  {
+    label: 'IMPROVEMENT & ARCHIVE',
+    items: [
+      { label: 'Concerned offices', to: '/offices', icon: Building2 },
+      { label: 'Improvement referrals', to: '/referrals', icon: Share2 },
+      { label: 'Evaluation archive', to: '/archive', icon: Archive },
     ],
   },
   {
@@ -128,6 +145,52 @@ const managementGroups = [
 
 
 
+// Evaluations a dean (of a department head) or an Academic Affairs VP (of a dean) fills in.
+const leadershipEvaluatorGroup = {
+  label: 'LEADERSHIP EVALUATION',
+  items: [
+    { label: 'Leadership evaluations', to: '/leadership-evaluations', icon: UserCheck },
+  ],
+};
+
+const academicVpGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
+  },
+  leadershipEvaluatorGroup,
+];
+
+// Referrals of performance gaps to concerned offices (committee, department heads, deans).
+const improvementGroup = {
+  label: 'IMPROVEMENT',
+  items: [
+    { label: 'Improvement referrals', to: '/referrals', icon: Share2 },
+  ],
+};
+
+const archivesGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
+  },
+  {
+    label: 'ARCHIVE',
+    items: [{ label: 'Evaluation archive', to: '/archive', icon: Archive }],
+  },
+];
+
+const concernedOfficeGroups = [
+  {
+    label: 'OVERVIEW',
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
+  },
+  {
+    label: 'SUPPORT PLANNING',
+    items: [{ label: 'My referrals', to: '/referrals', icon: Share2 }],
+  },
+];
+
 function getInitials(user) {
   const name = user?.name?.trim();
 
@@ -160,9 +223,22 @@ function getNavigationGroups(role) {
     case 'teacher':
       return instructorGroups;
 
+    case 'dean':
+      return [...managementGroups, leadershipEvaluatorGroup, improvementGroup];
+
+    case 'academic_vp':
+      return academicVpGroups;
+
+    case 'archives':
+      return archivesGroups;
+
+    case 'concerned_office':
+      return concernedOfficeGroups;
+
     case 'department_head':
     case 'committee':
-    case 'dean':
+      return [...managementGroups, improvementGroup];
+
     case 'management':
       return managementGroups;
 

@@ -1,4 +1,3 @@
-
 const VALID_ROLES = new Set([
   'admin',
   'student',
@@ -7,6 +6,9 @@ const VALID_ROLES = new Set([
   'dean',
   'committee',
   'management',
+  'academic_vp',
+  'archives',
+  'concerned_office',
 ]);
 
 export function authorize(...allowedRoles) {
