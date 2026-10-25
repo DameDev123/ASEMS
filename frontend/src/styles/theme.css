@@ -1,0 +1,500 @@
+
+/* ==========================================
+   ASEMS DARK MODE — FINAL OVERRIDES
+   Keep this section at the END of theme.css
+   ========================================== */
+
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  background-color: #0c1917 !important;
+  color: #edf5f1 !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .asems-app-shell {
+  background-color: #0c1917 !important;
+  color: #edf5f1 !important;
+}
+
+/* Dashboard cards and content panels */
+html[data-theme="dark"] .asems-surface,
+html[data-theme="dark"] .asems-themed-card,
+html[data-theme="dark"] .asems-stat-card,
+html[data-theme="dark"] .asems-dashboard-panel,
+html[data-theme="dark"] .panel-card {
+  background-color: #142522 !important;
+  color: #edf5f1 !important;
+  border-color: #2c453d !important;
+}
+
+/* Prevent hard-coded white backgrounds */
+html[data-theme="dark"] .asems-app-shell .bg-white,
+html[data-theme="dark"] .asems-app-shell .bg-white\/95,
+html[data-theme="dark"] .asems-app-shell .bg-white\/90,
+html[data-theme="dark"] .asems-app-shell .bg-slate-50,
+html[data-theme="dark"] .asems-app-shell .bg-gray-50 {
+  background-color: #142522 !important;
+}
+
+/* Secondary surfaces */
+html[data-theme="dark"] .asems-surface-secondary,
+html[data-theme="dark"] .asems-app-shell .bg-slate-100,
+html[data-theme="dark"] .asems-app-shell .bg-gray-100 {
+  background-color: #1b322d !important;
+  color: #edf5f1 !important;
+}
+
+/* Main text */
+html[data-theme="dark"] .asems-text-primary,
+html[data-theme="dark"] .asems-app-shell .text-slate-950,
+html[data-theme="dark"] .asems-app-shell .text-slate-900,
+html[data-theme="dark"] .asems-app-shell .text-slate-800,
+html[data-theme="dark"] .asems-app-shell .text-slate-700,
+html[data-theme="dark"] .asems-app-shell .text-gray-900,
+html[data-theme="dark"] .asems-app-shell .text-gray-800 {
+  color: #edf5f1 !important;
+}
+
+/* Secondary text */
+html[data-theme="dark"] .asems-muted,
+html[data-theme="dark"] .asems-table-secondary,
+html[data-theme="dark"] .asems-app-shell .text-slate-600,
+html[data-theme="dark"] .asems-app-shell .text-slate-500,
+html[data-theme="dark"] .asems-app-shell .text-slate-400,
+html[data-theme="dark"] .asems-app-shell .text-gray-600,
+html[data-theme="dark"] .asems-app-shell .text-gray-500 {
+  color: #a0b4ab !important;
+}
+
+/* Header and footer */
+html[data-theme="dark"] .asems-header {
+  background-color: #142522 !important;
+  color: #edf5f1 !important;
+  border-color: #2c453d !important;
+}
+
+html[data-theme="dark"] .asems-footer {
+  color: #a0b4ab !important;
+  border-color: #2c453d !important;
+}
+
+/* Sidebar stays dark in both themes */
+html[data-theme="dark"] .asems-app-shell .asems-sidebar {
+  background-color: #102b26 !important;
+  color: #f4f7f6 !important;
+}
+
+html[data-theme="dark"] .asems-sidebar-heading {
+  color: #b0c6bd !important;
+}
+
+html[data-theme="dark"] .asems-sidebar-link {
+  color: #d5e2dc !important;
+}
+
+html[data-theme="dark"] .asems-sidebar-link:hover,
+html[data-theme="dark"] .asems-sidebar-link.is-active {
+  background-color: #24443b !important;
+  color: #ffffff !important;
+}
+
+/* Tables */
+html[data-theme="dark"] .asems-dashboard-table,
+html[data-theme="dark"] .asems-dashboard-table tbody {
+  background-color: #142522 !important;
+  color: #edf5f1 !important;
+}
+
+html[data-theme="dark"] .asems-dashboard-table thead,
+html[data-theme="dark"] .asems-dashboard-table th {
+  background-color: #1b322d !important;
+  color: #c2d2ca !important;
+}
+
+html[data-theme="dark"] .asems-dashboard-table td,
+html[data-theme="dark"] .asems-dashboard-table tr {
+  border-color: #2c453d !important;
+}
+
+html[data-theme="dark"] .asems-dashboard-table tbody tr:hover {
+  background-color: #1b322d !important;
+}
+
+/* Forms and dropdowns */
+html[data-theme="dark"] .asems-app-shell input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] .asems-app-shell select,
+html[data-theme="dark"] .asems-app-shell textarea {
+  background-color: #10201d !important;
+  color: #edf5f1 !important;
+  border-color: #38554a !important;
+}
+
+html[data-theme="dark"] .asems-app-shell input::placeholder,
+html[data-theme="dark"] .asems-app-shell textarea::placeholder {
+  color: #91a79d !important;
+}
+
+html[data-theme="dark"] .asems-profile-trigger {
+  color: #edf5f1 !important;
+}
+
+html[data-theme="dark"] .asems-profile-trigger:hover {
+  background-color: #1b322d !important;
+}
+
+/* Buttons */
+html[data-theme="dark"] .asems-secondary-button,
+html[data-theme="dark"] .asems-theme-toggle {
+  background-color: #19312b !important;
+  color: #edf5f1 !important;
+  border-color: #38554a !important;
+}
+
+html[data-theme="dark"] .asems-secondary-button:hover,
+html[data-theme="dark"] .asems-theme-toggle:hover {
+  background-color: #24443b !important;
+}
+
+/* Progress bar */
+html[data-theme="dark"] .asems-progress-track {
+  background-color: #263d35 !important;
+}
+
+html[data-theme="dark"] .asems-progress-fill {
+  background-color: #72c6aa !important;
+}
+
+/* Preserve readable status badges */
+html[data-theme="dark"] .status-green {
+  background-color: #153e32 !important;
+  color: #8de0b6 !important;
+}
+
+html[data-theme="dark"] .status-blue {
+  background-color: #193650 !important;
+  color: #a5d5ff !important;
+}
+
+html[data-theme="dark"] .status-amber {
+  background-color: #49371b !important;
+  color: #ffda8a !important;
+}
+
+html[data-theme="dark"] .status-gray {
+  background-color: #293a36 !important;
+  color: #c1cec9 !important;
+}
+
+/* Error panel */
+html[data-theme="dark"] .asems-error-panel {
+  background-color: #351b25 !important;
+  border-color: #743344 !important;
+  color: #fecdd3 !important;
+}
+
+/* Keep links readable */
+html[data-theme="dark"] .asems-dashboard-link {
+  color: #a7dfce !important;
+}
+
+html[data-theme="dark"] .asems-dashboard-link:hover {
+  color: #ffcb3d !important;
+}
+
+/* Avoid white card flashes during theme transitions */
+.asems-surface,
+.asems-themed-card,
+.asems-stat-card,
+.asems-header {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+
+
+/* ==========================================
+   ASEMS LIGHT MODE — READABILITY FIX
+   Append at the very end of theme.css
+   ========================================== */
+
+html[data-theme="light"],
+html[data-theme="light"] body,
+html[data-theme="light"] #root {
+  color-scheme: light;
+  background-color: #f3f6f5;
+  color: #17312b;
+}
+
+html[data-theme="light"] .asems-app-shell {
+  background-color: #f3f6f5;
+  color: #17312b;
+}
+
+/* Cards and panels */
+html[data-theme="light"] .asems-surface,
+html[data-theme="light"] .asems-themed-card,
+html[data-theme="light"] .asems-stat-card,
+html[data-theme="light"] .asems-dashboard-panel,
+html[data-theme="light"] .panel-card {
+  background-color: #ffffff;
+  color: #17312b;
+  border-color: #dce6e1;
+}
+
+/* Main headings and text */
+html[data-theme="light"] .asems-text-primary,
+html[data-theme="light"] .asems-app-shell .text-slate-950,
+html[data-theme="light"] .asems-app-shell .text-slate-900,
+html[data-theme="light"] .asems-app-shell .text-slate-800,
+html[data-theme="light"] .asems-app-shell .text-slate-700,
+html[data-theme="light"] .asems-app-shell .text-gray-900,
+html[data-theme="light"] .asems-app-shell .text-gray-800 {
+  color: #17312b;
+}
+
+html[data-theme="light"] .asems-muted,
+html[data-theme="light"] .asems-table-secondary,
+html[data-theme="light"] .asems-app-shell .text-slate-600,
+html[data-theme="light"] .asems-app-shell .text-slate-500,
+html[data-theme="light"] .asems-app-shell .text-gray-600,
+html[data-theme="light"] .asems-app-shell .text-gray-500 {
+  color: #60766e;
+}
+
+/* Header and profile */
+html[data-theme="light"] .asems-header {
+  background-color: #ffffff;
+  color: #17312b;
+  border-color: #dce6e1;
+}
+
+html[data-theme="light"] .asems-profile-trigger {
+  color: #17312b;
+}
+
+html[data-theme="light"] .asems-profile-trigger:hover {
+  background-color: #edf3f0;
+}
+
+/* Tables */
+html[data-theme="light"] .asems-dashboard-table {
+  background-color: #ffffff;
+  color: #17312b;
+}
+
+html[data-theme="light"] .asems-dashboard-table thead,
+html[data-theme="light"] .asems-dashboard-table th {
+  background-color: #edf3f0;
+  color: #60766e;
+}
+
+html[data-theme="light"] .asems-dashboard-table td,
+html[data-theme="light"] .asems-dashboard-table tr {
+  border-color: #dce6e1;
+}
+
+html[data-theme="light"] .asems-dashboard-table tbody tr:hover {
+  background-color: #f3f6f5;
+}
+
+/* Inputs and dropdowns */
+html[data-theme="light"] .asems-app-shell input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="light"] .asems-app-shell select,
+html[data-theme="light"] .asems-app-shell textarea {
+  background-color: #ffffff;
+  color: #17312b;
+  border-color: #cbd9d2;
+}
+
+html[data-theme="light"] .asems-app-shell input::placeholder,
+html[data-theme="light"] .asems-app-shell textarea::placeholder {
+  color: #60766e;
+}
+
+/* Buttons */
+html[data-theme="light"] .asems-secondary-button,
+html[data-theme="light"] .asems-theme-toggle {
+  background-color: #ffffff;
+  color: #17312b;
+  border-color: #dce6e1;
+}
+
+html[data-theme="light"] .asems-secondary-button:hover,
+html[data-theme="light"] .asems-theme-toggle:hover {
+  background-color: #edf3f0;
+}
+
+/* Dashboard links */
+html[data-theme="light"] .asems-dashboard-link {
+  color: #123b33;
+}
+
+html[data-theme="light"] .asems-dashboard-link:hover {
+  color: #946200;
+}
+
+/* Progress bar */
+html[data-theme="light"] .asems-progress-track {
+  background-color: #e4ebe7;
+}
+
+html[data-theme="light"] .asems-progress-fill {
+  background-color: #0f9f86;
+}
+
+/* Status badges */
+html[data-theme="light"] .status-green {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+html[data-theme="light"] .status-blue {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+html[data-theme="light"] .status-amber {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+html[data-theme="light"] .status-gray {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+/* Sidebar remains dark in both themes */
+html[data-theme="light"] .asems-app-shell .asems-sidebar {
+  background-color: #102b26;
+  color: #f4f7f6;
+}
+
+html[data-theme="light"] .asems-sidebar-heading {
+  color: #b0c6bd;
+}
+
+html[data-theme="light"] .asems-sidebar-link {
+  color: #d5e2dc;
+}
+
+html[data-theme="light"] .asems-sidebar-link:hover,
+html[data-theme="light"] .asems-sidebar-link.is-active {
+  color: #ffffff;
+  background-color: #24443b;
+}
+
+/* Error messages */
+html[data-theme="light"] .asems-error-panel {
+  background-color: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+
+
+
+
+/* ASEMS AppLayout theme compatibility */
+.asems-app-shell {
+  min-height: 100vh;
+  background: var(--asems-bg);
+  color: var(--asems-text);
+}
+
+.asems-header {
+  background: var(--asems-surface);
+  color: var(--asems-text);
+  border-color: var(--asems-border);
+}
+
+.asems-main {
+  color: var(--asems-text);
+}
+
+.asems-themed-card {
+  background: var(--asems-surface);
+  color: var(--asems-text);
+  border: 1px solid var(--asems-border);
+}
+
+.asems-muted {
+  color: var(--asems-text-muted);
+}
+
+.asems-text-primary {
+  color: var(--asems-text);
+}
+
+.asems-profile-trigger {
+  color: var(--asems-text);
+}
+
+.asems-profile-trigger:hover {
+  background: var(--asems-surface-secondary);
+}
+
+.asems-profile-divider {
+  background: var(--asems-border);
+}
+
+.asems-footer {
+  border-color: var(--asems-border);
+  color: var(--asems-text-muted);
+}
+
+.asems-signout-button {
+  color: #b91c1c;
+}
+
+.asems-signout-button:hover {
+  background: #fef2f2;
+}
+
+html[data-theme='dark'] .asems-signout-button {
+  color: #fca5a5;
+}
+
+html[data-theme='dark'] .asems-signout-button:hover {
+  background: rgb(127 29 29 / 25%);
+}
+
+/* Sidebar stays dark in both themes */
+.asems-sidebar {
+  background: #0b2924;
+  color: #f5f7f6;
+  border-color: rgb(255 255 255 / 10%);
+}
+
+.asems-sidebar-heading {
+  color: #b8ccc5;
+}
+
+.asems-sidebar-link {
+  color: #d5e2dc;
+}
+
+.asems-sidebar-link:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+
+.asems-sidebar-link.is-active {
+  color: #fff;
+  background: rgb(255 255 255 / 12%);
+}
+
+.asems-sidebar-footer {
+  border-color: rgb(255 255 255 / 10%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asems-sidebar-link,
+  .asems-app-shell,
+  .asems-header,
+  .asems-themed-card,
+  .asems-profile-trigger {
+    transition: none;
+  }
+}

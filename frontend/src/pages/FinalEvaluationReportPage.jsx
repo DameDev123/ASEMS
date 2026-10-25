@@ -69,15 +69,19 @@ function titleCase(value = '') {
 }
 
 function getRows(response) {
-  const data = response?.data;
+  const candidates = [
+    response?.data?.items,
+    response?.data?.reports,
+    response?.data?.rows,
+    response?.items,
+    response?.reports,
+    response?.rows,
+    response?.data,
+  ];
 
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.reports)) return data.reports;
-  if (Array.isArray(data?.rows)) return data.rows;
-  if (Array.isArray(response?.reports)) return response.reports;
-
-  return [];
+  return candidates.find(Array.isArray) ?? [];
 }
+
 
 function getCycles(rows) {
   const unique = new Map();

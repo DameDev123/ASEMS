@@ -1,10 +1,10 @@
+
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   BookOpen,
   Building2,
   CalendarDays,
-  Archive,
   ChartNoAxesCombined,
   ChevronDown,
   ClipboardCheck,
@@ -15,12 +15,15 @@ import {
   LogOut,
   Menu,
   Settings,
-  Share2,
   ShieldCheck,
+  TrendingUp,
   UserCheck,
   Users,
   X,
+  Archive,
 } from 'lucide-react';
+
+import ThemeToggle from '../components/ThemeToggle.jsx';
 
 const adminGroups = [
   {
@@ -46,36 +49,10 @@ const adminGroups = [
     ],
   },
   {
-    label: 'LEADERSHIP',
-    items: [
-      { label: 'Leadership forms', to: '/leadership-forms', icon: ClipboardList },
-      { label: 'Leadership evaluations', to: '/leadership-assignments', icon: UserCheck },
-    ],
-  },
-  {
-    label: 'IMPROVEMENT & ARCHIVE',
-    items: [
-      { label: 'Concerned offices', to: '/offices', icon: Building2 },
-      { label: 'Improvement referrals', to: '/referrals', icon: Share2 },
-      { label: 'Evaluation archive', to: '/archive', icon: Archive },
-    ],
-  },
-  {
     label: 'REPORTING',
     items: [
-      {
-        label: 'Reports & workflow',
-        to: '/reports',
-        icon: ChartNoAxesCombined,
-      },
-
-
-      {
-  label: 'Final Evaluation Report',
-  to: '/final-report',
-  icon: FileText,
-},
-
+      { label: 'Reports & workflow', to: '/reports', icon: ChartNoAxesCombined },
+      { label: 'Final Evaluation Report', to: '/final-report', icon: FileText },
       { label: 'Audit trail', to: '/audit', icon: ShieldCheck },
     ],
   },
@@ -101,11 +78,7 @@ const instructorGroups = [
     label: 'MY WORK',
     items: [
       { label: 'My Evaluations', to: '/my-evaluations', icon: FileText },
-      {
-        label: 'My Results',
-        to: '/my-results',
-        icon: ChartNoAxesCombined,
-      },
+      { label: 'My Results', to: '/my-results', icon: ChartNoAxesCombined },
     ],
   },
 ];
@@ -113,81 +86,15 @@ const instructorGroups = [
 const managementGroups = [
   {
     label: 'OVERVIEW',
-    items: [
-      {
-        label: 'Dashboard',
-        to: '/',
-        icon: LayoutDashboard,
-      },
-    ],
+    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
   },
   {
     label: 'EVALUATION',
     items: [
-      {
-        label: 'My evaluations',
-        to: '/my-evaluations',
-        icon: FileText,
-      },
-      {
-        label: 'Reports & workflow',
-        to: '/reports',
-        icon: ChartNoAxesCombined,
-      },
-      {
-        label: 'Final Evaluation Report',
-        to: '/final-report',
-        icon: FileText,
-      },
+      { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
+      { label: 'Reports & workflow', to: '/reports', icon: ChartNoAxesCombined },
+      { label: 'Final Evaluation Report', to: '/final-report', icon: FileText },
     ],
-  },
-];
-
-
-
-// Evaluations a dean (of a department head) or an Academic Affairs VP (of a dean) fills in.
-const leadershipEvaluatorGroup = {
-  label: 'LEADERSHIP EVALUATION',
-  items: [
-    { label: 'Leadership evaluations', to: '/leadership-evaluations', icon: UserCheck },
-  ],
-};
-
-const academicVpGroups = [
-  {
-    label: 'OVERVIEW',
-    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
-  },
-  leadershipEvaluatorGroup,
-];
-
-// Referrals of performance gaps to concerned offices (committee, department heads, deans).
-const improvementGroup = {
-  label: 'IMPROVEMENT',
-  items: [
-    { label: 'Improvement referrals', to: '/referrals', icon: Share2 },
-  ],
-};
-
-const archivesGroups = [
-  {
-    label: 'OVERVIEW',
-    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
-  },
-  {
-    label: 'ARCHIVE',
-    items: [{ label: 'Evaluation archive', to: '/archive', icon: Archive }],
-  },
-];
-
-const concernedOfficeGroups = [
-  {
-    label: 'OVERVIEW',
-    items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
-  },
-  {
-    label: 'SUPPORT PLANNING',
-    items: [{ label: 'My referrals', to: '/referrals', icon: Share2 }],
   },
 ];
 
@@ -215,37 +122,76 @@ function formatRole(role) {
     .join(' ');
 }
 
-function getNavigationGroups(role) {
+const overviewGroup = {
+  label: 'OVERVIEW',
+  items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
+};
+
+const leadershipItem = {
+  label: 'Leadership evaluations',
+  to: '/leadership',
+  icon: UserCheck,
+};
+
+const improvementItem = {
+  label: 'Performance improvement',
+  to: '/improvement',
+  icon: TrendingUp,
+};
+
+const archiveItem = {
+  label: 'Evaluation archives',
+  to: '/archive',
+  icon: Archive,
+};
+
+function workflowItems(role) {
+  switch (role) {
+    case 'admin':
+      return [leadershipItem, improvementItem, archiveItem];
+    case 'dean':
+      return [leadershipItem, improvementItem];
+    case 'academic_vp':
+      return [leadershipItem];
+    case 'committee':
+    case 'department_head':
+    case 'concerned_office':
+      return [improvementItem];
+    case 'archives':
+      return [archiveItem];
+    default:
+      return [];
+  }
+}
+
+function baseGroups(role) {
   switch (role) {
     case 'admin':
       return adminGroups;
-
     case 'teacher':
       return instructorGroups;
-
-    case 'dean':
-      return [...managementGroups, leadershipEvaluatorGroup, improvementGroup];
-
-    case 'academic_vp':
-      return academicVpGroups;
-
-    case 'archives':
-      return archivesGroups;
-
-    case 'concerned_office':
-      return concernedOfficeGroups;
-
     case 'department_head':
     case 'committee':
-      return [...managementGroups, improvementGroup];
-
+    case 'dean':
     case 'management':
       return managementGroups;
-
+    case 'academic_vp':
+    case 'archives':
+    case 'concerned_office':
+      return [overviewGroup];
     case 'student':
     default:
       return evaluationGroups;
   }
+}
+
+function getNavigationGroups(role) {
+  const base = baseGroups(role);
+  const extra = workflowItems(role);
+
+  return extra.length
+    ? [...base, { label: 'WORKFLOW', items: extra }]
+    : base;
 }
 
 export default function AppLayout({ user, onLogout }) {
@@ -265,18 +211,18 @@ export default function AppLayout({ user, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="asems-app-shell min-h-screen">
       {mobileOpen && (
         <button
           type="button"
           aria-label="Close navigation overlay"
-          className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-[2px] lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-navy-950 text-white transition-transform duration-200 lg:translate-x-0 ${
+        className={`asems-sidebar fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-white/10 transition-transform duration-200 lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -285,9 +231,11 @@ export default function AppLayout({ user, onLogout }) {
             <GraduationCap size={23} />
           </div>
 
-          <div>
-            <div className="text-lg font-semibold tracking-wide">ASEMS</div>
-            <div className="text-[11px] text-slate-300">
+          <div className="min-w-0">
+            <div className="text-lg font-semibold tracking-wide text-white">
+              ASEMS
+            </div>
+            <div className="asems-sidebar-heading text-[11px]">
               AMBO UNIVERSITY
             </div>
           </div>
@@ -308,7 +256,7 @@ export default function AppLayout({ user, onLogout }) {
         >
           {navigationGroups.map((group) => (
             <section key={group.label}>
-              <h2 className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+              <h2 className="asems-sidebar-heading mb-2 px-3 text-[10px] font-semibold tracking-[0.16em]">
                 {group.label}
               </h2>
 
@@ -320,15 +268,29 @@ export default function AppLayout({ user, onLogout }) {
                     end={to === '/'}
                     onClick={() => setMobileOpen(false)}
                     className={({ isActive }) =>
-                      `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition ${
+                      `asems-sidebar-link relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition ${
                         isActive
-                          ? 'bg-white/10 font-semibold text-white before:absolute before:left-0 before:h-7 before:w-1 before:rounded-r before:bg-gold-400'
-                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                          ? 'is-active font-semibold'
+                          : ''
                       }`
                     }
                   >
-                    <Icon size={17} strokeWidth={1.8} />
-                    <span>{label}</span>
+                    {({ isActive }) => (
+                      <>
+                        {isActive && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute bottom-1.5 left-0 top-1.5 w-1 rounded-r bg-gold-400"
+                          />
+                        )}
+                        <Icon
+                          size={17}
+                          strokeWidth={isActive ? 2.2 : 1.8}
+                          aria-hidden="true"
+                        />
+                        <span>{label}</span>
+                      </>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -336,24 +298,22 @@ export default function AppLayout({ user, onLogout }) {
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-white/10 p-4">
+        <div className="asems-sidebar-footer shrink-0 border-t border-white/10 p-4">
           <NavLink
             to="/settings"
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-                isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              `asems-sidebar-link flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                isActive ? 'is-active font-semibold' : ''
               }`
             }
           >
-            <Settings size={17} />
+            <Settings size={17} aria-hidden="true" />
             Settings
           </NavLink>
 
           <div className="mt-3 rounded-xl bg-white/5 p-3">
-            <div className="flex items-center gap-2 text-xs font-medium">
+            <div className="flex items-center gap-2 text-xs font-medium text-white">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               ASEMS workspace
             </div>
@@ -365,62 +325,67 @@ export default function AppLayout({ user, onLogout }) {
       </aside>
 
       <div className="min-h-screen lg:pl-[264px]">
-        <header className="sticky top-0 z-20 flex h-[78px] items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7">
+        <header className="asems-header sticky top-0 z-20 flex h-[78px] items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-7">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               className="icon-button lg:hidden"
               aria-label="Open navigation"
+              aria-controls="asems-sidebar"
+              aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(true)}
             >
               <Menu size={20} />
             </button>
 
-            <div className="hidden text-sm text-slate-500 sm:block">
-              Academic Affairs
-              <span className="mx-2 text-slate-300">/</span>
-              <span className="font-medium text-slate-800">Workspace</span>
+            <div className="hidden text-sm sm:block">
+              <span className="asems-muted">Academic Affairs</span>
+              <span className="mx-2 asems-muted">/</span>
+              <span className="asems-text-primary font-medium">Workspace</span>
             </div>
 
-            <div className="text-sm font-semibold sm:hidden">ASEMS</div>
+            <div className="asems-text-primary text-sm font-semibold sm:hidden">
+              ASEMS
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <ThemeToggle />
+
             <div className="hidden text-right md:block">
-              <p className="text-xs font-medium text-slate-500">
-                Signed in as
-              </p>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="asems-muted text-xs font-medium">Signed in as</p>
+              <p className="asems-text-primary text-sm font-semibold">
                 {formatRole(user?.role)}
               </p>
             </div>
 
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+            <div className="asems-profile-divider hidden h-8 w-px sm:block" />
 
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setProfileOpen((open) => !open)}
                 aria-expanded={profileOpen}
+                aria-haspopup="menu"
                 aria-label="Open user menu"
-                className="flex max-w-[220px] items-center gap-2 rounded-lg p-1.5 transition hover:bg-slate-50"
+                className="asems-profile-trigger flex max-w-[220px] items-center gap-2 rounded-lg p-1.5 transition"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-900 text-sm font-semibold text-white">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--asems-primary)] text-sm font-semibold text-white">
                   {getInitials(user)}
                 </span>
 
                 <span className="hidden min-w-0 text-left sm:block">
-                  <span className="block max-w-36 truncate text-xs font-semibold text-slate-800">
+                  <span className="asems-text-primary block max-w-36 truncate text-xs font-semibold">
                     {user?.name || 'ASEMS User'}
                   </span>
-                  <span className="block max-w-36 truncate text-[11px] text-slate-500">
+                  <span className="asems-muted block max-w-36 truncate text-[11px]">
                     {formatRole(user?.role)}
                   </span>
                 </span>
 
                 <ChevronDown
                   size={14}
-                  className={`hidden shrink-0 text-slate-400 transition sm:block ${
+                  className={`asems-muted hidden shrink-0 transition sm:block ${
                     profileOpen ? 'rotate-180' : ''
                   }`}
                 />
@@ -435,23 +400,28 @@ export default function AppLayout({ user, onLogout }) {
                     onClick={() => setProfileOpen(false)}
                   />
 
-                  <div className="absolute right-0 z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
-                    <div className="border-b border-slate-100 px-3 py-3">
-                      <p className="truncate text-sm font-semibold text-slate-900">
+                  <div
+                    role="menu"
+                    aria-label="User profile options"
+                    className="asems-themed-card absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl p-2 shadow-xl"
+                  >
+                    <div className="border-b border-[var(--asems-border)] px-3 py-3">
+                      <p className="asems-text-primary truncate text-sm font-semibold">
                         {user?.name || 'ASEMS User'}
                       </p>
-                      <p className="mt-1 truncate text-xs text-slate-500">
+                      <p className="asems-muted mt-1 truncate text-xs">
                         {user?.email || ''}
                       </p>
-                      <p className="mt-2 text-xs font-medium text-slate-600">
+                      <p className="asems-muted mt-2 text-xs font-medium">
                         {formatRole(user?.role)}
                       </p>
                     </div>
 
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={handleLogout}
-                      className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                      className="asems-signout-button mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
                     >
                       <LogOut size={16} />
                       Sign out
@@ -463,11 +433,11 @@ export default function AppLayout({ user, onLogout }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1600px] p-4 sm:p-7 lg:p-8">
+        <main className="asems-main mx-auto min-h-[calc(100vh-78px)] max-w-[1600px] p-4 sm:p-7 lg:p-8">
           <Outlet />
         </main>
 
-        <footer className="border-t border-slate-200 px-7 py-4 text-center text-xs text-slate-400">
+        <footer className="asems-footer border-t px-7 py-4 text-center text-xs">
           ASEMS · Ambo University
         </footer>
       </div>

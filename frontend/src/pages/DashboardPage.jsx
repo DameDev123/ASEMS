@@ -7,16 +7,17 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock3,
-  FileCheck2,
   RefreshCw,
   UsersRound,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
 import StatCard from '../components/StatCard.jsx';
 import { apiRequest } from '../services/api.js';
 
 function formatNumber(value) {
   const number = Number(value ?? 0);
+
   return Number.isFinite(number)
     ? new Intl.NumberFormat().format(number)
     : '—';
@@ -26,6 +27,7 @@ function formatDate(value) {
   if (!value) return '—';
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return '—';
 
   return new Intl.DateTimeFormat(undefined, {
@@ -41,11 +43,14 @@ function statusClass(status) {
     case 'approved':
     case 'completed':
       return 'status-green';
+
     case 'pending':
     case 'in_progress':
       return 'status-amber';
+
     case 'draft':
       return 'status-blue';
+
     default:
       return 'status-gray';
   }
@@ -55,10 +60,42 @@ function SectionHeading({ title, description, action }) {
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <h2 className="asems-text-primary text-base font-semibold">
+          {title}
+        </h2>
+
+        <p className="asems-muted mt-1 text-sm">
+          {description}
+        </p>
       </div>
+
       {action}
+    </div>
+  );
+}
+
+function DashboardLink({ to, children }) {
+  return (
+    <Link
+      to={to}
+      className="asems-dashboard-link inline-flex items-center gap-1 text-sm font-medium"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function LoadingPanel() {
+  return (
+    <div className="asems-surface flex items-center gap-3 rounded-xl border p-8 text-sm">
+      <span
+        className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--asems-border)] border-t-[var(--asems-accent)]"
+        aria-hidden="true"
+      />
+
+      <span className="asems-muted">
+        Loading live dashboard data…
+      </span>
     </div>
   );
 }
@@ -82,7 +119,9 @@ export default function DashboardPage() {
       const response = await apiRequest('/dashboard');
 
       if (!response?.success || !response?.data) {
-        throw new Error('The dashboard API returned an unexpected response.');
+        throw new Error(
+          'The dashboard API returned an unexpected response.',
+        );
       }
 
       setDashboard(response.data);
@@ -105,22 +144,29 @@ export default function DashboardPage() {
 
   const totalAssignments = Number(counts.total ?? 0);
   const submittedAssignments = Number(counts.submitted ?? 0);
-  const completion = totalAssignments > 0
-    ? Math.round((submittedAssignments / totalAssignments) * 100)
-    : 0;
+
+  const completion =
+    totalAssignments > 0
+      ? Math.round(
+          (submittedAssignments / totalAssignments) * 100,
+        )
+      : 0;
 
   return (
     <div className="space-y-8">
+      {/* Page heading */}
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-gold-700">
+          <div className="asems-dashboard-eyebrow mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em]">
             <span className="h-px w-6 bg-gold-500" />
             Academic performance
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-[30px]">
+
+          <h1 className="asems-text-primary text-2xl font-semibold tracking-tight sm:text-[30px]">
             Evaluation overview
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+
+          <p className="asems-muted mt-2 max-w-2xl text-sm leading-6">
             Live evaluation statistics and recent records from ASEMS.
           </p>
         </div>
@@ -129,27 +175,34 @@ export default function DashboardPage() {
           type="button"
           onClick={() => loadDashboard(true)}
           disabled={loading || refreshing}
-          className="secondary-button inline-flex items-center gap-2"
+          className="asems-secondary-button inline-flex items-center gap-2"
         >
           <RefreshCw
             size={16}
             className={refreshing ? 'animate-spin' : ''}
+            aria-hidden="true"
           />
+
           {refreshing ? 'Refreshing…' : 'Refresh data'}
         </button>
       </section>
 
+      {/* Error message */}
       {error && (
         <div
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          className="asems-error-panel rounded-xl border p-4 text-sm"
         >
-          <p className="font-semibold">Dashboard data could not be loaded</p>
+          <p className="font-semibold">
+            Dashboard data could not be loaded
+          </p>
+
           <p className="mt-1">{error}</p>
+
           <button
             type="button"
             onClick={() => loadDashboard()}
-            className="mt-3 font-semibold underline"
+            className="mt-3 font-semibold underline underline-offset-2"
           >
             Try again
           </button>
@@ -157,13 +210,14 @@ export default function DashboardPage() {
       )}
 
       {loading && !dashboard ? (
-        <div className="panel-card flex items-center gap-3 p-8 text-sm text-slate-600">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-navy-900" />
-          Loading live dashboard data…
-        </div>
+        <LoadingPanel />
       ) : (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Statistics */}
+          <section
+            aria-label="Evaluation statistics"
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          >
             {users !== null && users !== undefined && (
               <StatCard
                 label="Total users"
@@ -199,8 +253,9 @@ export default function DashboardPage() {
             />
           </section>
 
+          {/* Completion and evaluation cycles */}
           <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="panel-card p-5 sm:p-6">
+            <div className="asems-surface rounded-xl border p-5 shadow-sm sm:p-6">
               <SectionHeading
                 title="Assignment completion"
                 description="Based on actual assignment statuses"
@@ -208,18 +263,24 @@ export default function DashboardPage() {
 
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-3xl font-semibold text-slate-900">
+                  <p className="asems-text-primary text-3xl font-semibold">
                     {completion}%
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
+
+                  <p className="asems-muted mt-1 text-sm">
                     Submitted assignments
                   </p>
                 </div>
-                <CheckCircle2 className="mb-1 text-teal-600" size={28} />
+
+                <CheckCircle2
+                  className="mb-1 text-teal-500"
+                  size={28}
+                  aria-hidden="true"
+                />
               </div>
 
               <div
-                className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100"
+                className="asems-progress-track mt-5 h-3 overflow-hidden rounded-full"
                 role="progressbar"
                 aria-label="Assignment completion"
                 aria-valuemin={0}
@@ -227,60 +288,69 @@ export default function DashboardPage() {
                 aria-valuenow={completion}
               >
                 <div
-                  className="h-full rounded-full bg-teal-600 transition-all"
+                  className="h-full rounded-full bg-teal-500 transition-all duration-500"
                   style={{ width: `${completion}%` }}
                 />
               </div>
 
-              <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-                <span>{formatNumber(counts.submitted)} submitted</span>
-                <span>{formatNumber(counts.total)} total assignments</span>
+              <div className="asems-muted mt-4 flex flex-wrap justify-between gap-2 text-xs">
+                <span>
+                  {formatNumber(counts.submitted)} submitted
+                </span>
+
+                <span>
+                  {formatNumber(counts.total)} total assignments
+                </span>
               </div>
 
               {totalAssignments === 0 && (
-                <p className="mt-4 text-sm text-slate-500">
+                <p className="asems-muted mt-4 text-sm">
                   No assignments are available for this dashboard scope yet.
                 </p>
               )}
             </div>
 
-            <div className="panel-card p-5 sm:p-6">
+            <div className="asems-surface rounded-xl border p-5 shadow-sm sm:p-6">
               <SectionHeading
                 title="Evaluation cycles"
                 description="Most recent cycles returned by the API"
                 action={
-                  <Link
-                    to="/cycles"
-                    className="inline-flex items-center gap-1 text-sm font-medium text-navy-900 hover:text-gold-700"
-                  >
+                  <DashboardLink to="/cycles">
                     View all <ArrowRight size={15} />
-                  </Link>
+                  </DashboardLink>
                 }
               />
 
               {cycles.length === 0 ? (
-                <p className="py-4 text-sm text-slate-500">
+                <p className="asems-muted py-4 text-sm">
                   No evaluation cycles were found.
                 </p>
               ) : (
-                <div className="space-y-4">
+                <div className="divide-y divide-[var(--asems-border)]">
                   {cycles.slice(0, 5).map((cycle) => (
                     <div
                       key={cycle.id}
-                      className="flex items-start justify-between gap-3"
+                      className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-800">
+                        <p className="asems-text-primary truncate text-sm font-medium">
                           {cycle.title}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {cycle.academic_year || 'Academic year not specified'}
+
+                        <p className="asems-muted mt-1 text-xs">
+                          {cycle.academic_year ||
+                            'Academic year not specified'}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {formatDate(cycle.start_date)} – {formatDate(cycle.end_date)}
+
+                        <p className="asems-muted mt-1 text-xs">
+                          {formatDate(cycle.start_date)} –{' '}
+                          {formatDate(cycle.end_date)}
                         </p>
                       </div>
-                      <span className={`status-pill ${statusClass(cycle.status)}`}>
+
+                      <span
+                        className={`status-pill shrink-0 ${statusClass(cycle.status)}`}
+                      >
                         {cycle.status || 'Unknown'}
                       </span>
                     </div>
@@ -290,25 +360,23 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="panel-card overflow-hidden">
+          {/* Recent evaluation activity */}
+          <section className="asems-surface overflow-hidden rounded-xl border shadow-sm">
             <div className="p-5 sm:p-6">
               <SectionHeading
                 title="Recent evaluation activity"
                 description="Latest assignment records returned by the backend"
                 action={
-                  <Link
-                    to="/tasks"
-                    className="inline-flex items-center gap-1 text-sm font-medium text-navy-900 hover:text-gold-700"
-                  >
+                  <DashboardLink to="/tasks">
                     View tasks <ArrowRight size={15} />
-                  </Link>
+                  </DashboardLink>
                 }
               />
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-y border-slate-100 bg-slate-50 text-xs font-medium text-slate-500">
+              <table className="asems-dashboard-table min-w-full text-left text-sm">
+                <thead>
                   <tr>
                     <th className="px-5 py-3">Form</th>
                     <th className="px-5 py-3">Instructor</th>
@@ -317,32 +385,42 @@ export default function DashboardPage() {
                     <th className="px-5 py-3">Submitted</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+
+                <tbody>
                   {recent.map((item) => {
-                    const status = item.evaluation_status || item.assignment_status;
+                    const status =
+                      item.evaluation_status || item.assignment_status;
 
                     return (
-                      <tr key={item.assignment_id} className="hover:bg-slate-50/70">
+                      <tr key={item.assignment_id}>
                         <td className="px-5 py-4">
-                          <p className="font-medium text-slate-800">
+                          <p className="asems-text-primary font-medium">
                             {item.form_title || 'Untitled form'}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {item.form_code || `Assignment #${item.assignment_id}`}
+
+                          <p className="asems-muted mt-1 text-xs">
+                            {item.form_code ||
+                              `Assignment #${item.assignment_id}`}
                           </p>
                         </td>
-                        <td className="px-5 py-4 text-slate-600">
+
+                        <td className="asems-table-secondary px-5 py-4">
                           {item.instructor_name || '—'}
                         </td>
-                        <td className="px-5 py-4 text-slate-600">
+
+                        <td className="asems-table-secondary px-5 py-4">
                           {item.cycle_title || '—'}
                         </td>
+
                         <td className="px-5 py-4">
-                          <span className={`status-pill ${statusClass(status)}`}>
+                          <span
+                            className={`status-pill ${statusClass(status)}`}
+                          >
                             {status || 'Unknown'}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-slate-500">
+
+                        <td className="asems-muted whitespace-nowrap px-5 py-4">
                           {formatDate(item.submitted_at)}
                         </td>
                       </tr>
@@ -353,9 +431,14 @@ export default function DashboardPage() {
                     <tr>
                       <td
                         colSpan={5}
-                        className="px-5 py-10 text-center text-sm text-slate-500"
+                        className="asems-muted px-5 py-10 text-center text-sm"
                       >
-                        <Activity className="mx-auto mb-2 text-slate-400" size={22} />
+                        <Activity
+                          className="mx-auto mb-2 opacity-70"
+                          size={22}
+                          aria-hidden="true"
+                        />
+
                         No evaluation activity is available yet.
                       </td>
                     </tr>
@@ -365,7 +448,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <p className="text-xs text-slate-400">
+          <p className="asems-muted text-xs">
             Figures reflect the records returned by the current dashboard API.
             Final weighted evaluation scores are not calculated here.
           </p>
