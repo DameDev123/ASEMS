@@ -1,10 +1,12 @@
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Archive, CheckCircle2, FileText, RefreshCw, Send, ShieldAlert } from 'lucide-react';
 import { apiRequest } from '../services/api.js';
 
 const VIEW_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management'];
-const REVIEW_ROLES = ['committee', 'department_head'];
+// Roles that take part in the approval chain: Committee -> Department Head -> Dean -> Management.
+const REVIEW_ROLES = ['committee', 'department_head', 'dean', 'management'];
+// Roles that may write the final Form E comments.
+const FINALIZE_ROLES = ['committee', 'department_head'];
 const REPORT_OFFICE_ROLE = import.meta.env.VITE_ASEMS_REPORT_OFFICE_ROLE || 'management';
 const SUMMARY_TONE = {
   incomplete: 'status-amber',
@@ -25,6 +27,7 @@ const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-lg 
 export default function ReportsWorkflowPage({ user }) {
   const allowed = VIEW_ROLES.includes(user?.role);
   const canReview = REVIEW_ROLES.includes(user?.role);
+  const canFinalize = FINALIZE_ROLES.includes(user?.role);
   const canAdmin = user?.role === 'admin';
   const canRoute = user?.role === REPORT_OFFICE_ROLE;
   const [cycles, setCycles] = useState([]);
@@ -234,7 +237,7 @@ export default function ReportsWorkflowPage({ user }) {
         <div>
           <p className="text-sm font-medium text-slate-500">Institutional reporting</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Reports &amp; workflow</h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">Review submitted forms, finalize official Form E comments, record the three required report copies, and track forwarding and archive events. This view does not impose an undocumented four-role approval chain.</p>
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">Forms are approved in this order: Committee, Department Head, Dean, then Management. You see the forms waiting for your stage, and you can track Form E summaries, report copies, forwarding and archive events.</p>
         </div>
         <button type="button" onClick={load} disabled={loading} className={button}><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
       </div>
@@ -245,9 +248,9 @@ export default function ReportsWorkflowPage({ user }) {
       <section className="panel-card overflow-hidden">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="text-sm font-semibold text-slate-900">Evaluation review queue</h2>
-          <p className="mt-1 text-xs text-slate-500">Committee members and department heads can review submitted forms within their permitted scope. Administrators can reopen rejected forms with a documented reason; reviewers cannot review their own submitted evaluation.</p>
+          <p className="mt-1 text-xs text-slate-500">Only forms waiting for your approval stage are listed. You cannot review an evaluation you wrote yourself. Administrators can reopen rejected forms with a documented reason.</p>
         </div>
-        {loading ? <p className="p-8 text-sm text-slate-500">Loading submitted forms…</p> : queue.length === 0 ? <p className="px-6 py-10 text-center text-sm text-slate-500">No evaluation forms are waiting for review or administrator action.</p> : (
+        {loading ? <p className="p-8 text-sm text-slate-500">Loading submitted forms…</p> : queue.length === 0 ? <p className="px-6 py-10 text-center text-sm text-slate-500">No evaluation forms are waiting for your review.</p> : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Instructor</th><th className="px-4 py-3">Evaluator</th><th className="px-4 py-3">Form</th><th className="px-4 py-3">Average</th><th className="px-4 py-3">Submitted</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
@@ -265,7 +268,7 @@ export default function ReportsWorkflowPage({ user }) {
 
       <section className="panel-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
-          <div><h2 className="text-sm font-semibold text-slate-900">Form E summaries</h2><p className="mt-1 text-xs text-slate-500">A summary becomes final only after all assigned forms are approved and the Committee/Head records the final comments.</p></div>
+          <div><h2 className="text-sm font-semibold text-slate-900">Form E summaries</h2><p className="mt-1 text-xs text-slate-500">A summary becomes final only after all four approval stages are complete for every assigned form.</p></div>
           <div className="grid gap-2 sm:grid-cols-3">
             <select aria-label="Filter by cycle" value={cycleId} onChange={(event) => setCycleId(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm"><option value="">All cycles</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.title} ({cycle.academicYear ?? cycle.academic_year})</option>)}</select>
             <select aria-label="Filter by summary status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm"><option value="">All statuses</option><option value="incomplete">Incomplete</option><option value="complete">Complete</option><option value="reviewed">Reviewed</option><option value="archived">Archived</option></select>
@@ -286,7 +289,7 @@ export default function ReportsWorkflowPage({ user }) {
                   <td className="px-4 py-4"><span className={`status-pill ${SUMMARY_TONE[row.status] || 'status-gray'}`}>{row.status}</span><span className="mt-1 block text-xs text-slate-400">{row.approved_assignments}/{row.total_assignments} forms approved</span></td>
                   <td className="min-w-52 px-4 py-4"><div className="flex flex-wrap gap-2">
                     <button type="button" className={button} onClick={() => window.location.assign(`/final-report?summaryId=${row.id}`)}><FileText size={13} /> Form E</button>
-                    {canReview && row.status === 'complete' && row.all_evaluations_approved && <button type="button" className={primaryButton} onClick={() => { setFinalize({ item: row, strengths: '', improvements: '' }); setReviewError(''); }}>Finalize</button>}
+                    {canFinalize && row.status === 'complete' && row.all_evaluations_approved && <button type="button" className={primaryButton} onClick={() => { setFinalize({ item: row, strengths: '', improvements: '' }); setReviewError(''); }}>Finalize</button>}
                     {canRoute && ['reviewed'].includes(row.status) && <button type="button" className={button} onClick={() => openRouting(row)}><Send size={13} /> Copies / archive</button>}
                     {row.status === 'complete' && !row.all_evaluations_approved && <span className="text-xs text-amber-700">Awaiting form review</span>}
                   </div></td>

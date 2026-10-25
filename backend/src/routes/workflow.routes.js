@@ -9,13 +9,14 @@ import { recomputeInstructorSummary } from '../services/summaryService.js';
 const router = Router();
 router.use(requireAuth);
 
+// Approval chain, in order. Each approval moves the form to the next role.
 const stageRoles = ['committee', 'department_head', 'dean', 'management'];
 const actionSchema = z.object({ action: z.enum(['approved', 'returned', 'rejected']), comment: z.string().max(10000).optional().nullable() });
 
 router.get('/queue', allowRoles('admin', ...stageRoles), asyncHandler(async (req, res) => {
   const [rows] = await pool.execute(
     `SELECT e.id AS evaluation_id, e.status AS evaluation_status, e.submitted_at,
-            a.id AS assignment_id, a.cycle_id, cy.title AS cycle_title, f.code AS form_code,
+            a.id AS assignment_id, a.cycle_id, a.evaluator_id, cy.title AS cycle_title, f.code AS form_code,
             f.title AS form_title, f.weight, instructor.name AS instructor_name,
             evaluator.name AS evaluator_name, e.overall_average, e.weighted_score,
             (SELECT COUNT(*) FROM evaluation_reviews r WHERE r.evaluation_id = e.id AND r.action = 'approved') AS approvals
@@ -28,7 +29,13 @@ router.get('/queue', allowRoles('admin', ...stageRoles), asyncHandler(async (req
       WHERE e.status = 'submitted'
       ORDER BY e.submitted_at ASC`
   );
-  const filtered = req.user.role === 'admin' ? rows : rows.filter(row => stageRoles[Number(row.approvals)] === req.user.role);
+  // Admin sees everything. Everyone else sees only forms waiting at their own stage,
+  // and never a form they evaluated themselves.
+  const filtered = req.user.role === 'admin'
+    ? rows
+    : rows.filter(row =>
+        stageRoles[Number(row.approvals)] === req.user.role &&
+        Number(row.evaluator_id) !== Number(req.user.id));
   sendData(res, filtered);
 }));
 
@@ -42,7 +49,7 @@ router.post('/:evaluationId/review', allowRoles('admin', ...stageRoles), asyncHa
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT e.id, e.status, a.id AS assignment_id, a.cycle_id, a.instructor_id
+      `SELECT e.id, e.status, a.id AS assignment_id, a.cycle_id, a.instructor_id, a.evaluator_id
          FROM evaluations e JOIN evaluation_assignments a ON a.id = e.assignment_id
         WHERE e.id = ? FOR UPDATE`,
       [evaluationId]
@@ -51,16 +58,21 @@ router.post('/:evaluationId/review', allowRoles('admin', ...stageRoles), asyncHa
     if (!evaluation) throw httpError(404, 'Evaluation not found.', 'NOT_FOUND');
     if (evaluation.status !== 'submitted') throw httpError(409, 'Only submitted evaluations can be reviewed.', 'NOT_REVIEWABLE');
 
+    // Reviewers cannot review an evaluation they wrote themselves.
+    if (Number(evaluation.evaluator_id) === Number(req.user.id)) {
+      throw httpError(403, 'You cannot review your own evaluation.', 'SELF_REVIEW');
+    }
+
     const [approvalRows] = await connection.execute(
       "SELECT COUNT(*) AS count FROM evaluation_reviews WHERE evaluation_id = ? AND action = 'approved'",
       [evaluationId]
     );
     const approvals = Number(approvalRows[0].count);
+    if (approvals >= stageRoles.length) throw httpError(409, 'All approval stages are already complete.', 'WORKFLOW_COMPLETE');
     const requiredRole = stageRoles[approvals];
     if (req.user.role !== 'admin' && req.user.role !== requiredRole) {
-      throw httpError(403, `This review stage requires the ${requiredRole ?? 'next authorized'} role.`, 'WRONG_REVIEW_STAGE');
+      throw httpError(403, `This review stage requires the ${requiredRole} role.`, 'WRONG_REVIEW_STAGE');
     }
-    if (approvals >= stageRoles.length) throw httpError(409, 'All approval stages are already complete.', 'WORKFLOW_COMPLETE');
 
     await connection.execute(
       'INSERT INTO evaluation_reviews (evaluation_id, reviewer_id, action, comment) VALUES (?, ?, ?, ?)',
@@ -73,8 +85,7 @@ router.post('/:evaluationId/review', allowRoles('admin', ...stageRoles), asyncHa
     if (parsed.data.action === 'approved' && approvals === stageRoles.length - 1) nextStatus = 'approved';
     await connection.execute('UPDATE evaluations SET status = ? WHERE id = ?', [nextStatus, evaluationId]);
 
-    // Every review action can change the result (a returned or rejected evaluation stops
-    // counting; the last approval releases it), so recalculate Form E inside this transaction.
+    // Every review action can change the result, so recalculate Form E in this transaction.
     const summary = await recomputeInstructorSummary(
       connection, evaluation.cycle_id, evaluation.instructor_id, { finalizedBy: Number(req.user.id) }
     );
