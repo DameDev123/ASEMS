@@ -5,11 +5,33 @@ import { requireAuth, allowRoles } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 import { writeAudit } from '../utils/audit.js';
 
-// Evaluation tasks = rows of evaluation_assignments. Only administrators manage them for now:
-// department heads and committees cannot be limited to their own department until users are
-// linked to departments (employees table).
+// Evaluation tasks = rows of evaluation_assignments.
+// Administrators manage every task. Committee members manage only the tasks of their own
+// department: staff are linked through employees.department_id and students through
+// student_departments.department_id. The limit is enforced here on the server, not in the UI.
 const router = Router();
-router.use(requireAuth, allowRoles('admin'));
+router.use(requireAuth, allowRoles('admin', 'committee'));
+
+// Returns null for administrators (no limit) or the committee member's department id.
+async function scopeFor(db, user) {
+  if (user.role === 'admin') return null;
+  const [rows] = await db.execute(
+    'SELECT department_id FROM employees WHERE user_id = ? LIMIT 1', [Number(user.id)],
+  );
+  const departmentId = rows[0]?.department_id;
+  if (!departmentId) {
+    throw httpError(403, 'Your account is not assigned to a department. Ask an administrator to assign one.', 'NO_DEPARTMENT');
+  }
+  return Number(departmentId);
+}
+
+const IN_DEPARTMENT = `SELECT user_id FROM employees WHERE department_id = ?
+                       UNION SELECT user_id FROM student_departments WHERE department_id = ?`;
+
+async function departmentUserIds(db, departmentId) {
+  const [rows] = await db.execute(IN_DEPARTMENT, [departmentId, departmentId]);
+  return new Set(rows.map((row) => Number(row.user_id)));
+}
 
 const id = z.number().int().positive();
 
@@ -35,10 +57,13 @@ function parseId(value, label) {
 
 // GET /api/tasks/candidates - active users that can be chosen as evaluators.
 router.get('/candidates', asyncHandler(async (req, res) => {
+  const departmentId = await scopeFor(pool, req.user);
+  const limit = departmentId === null ? '' : `AND id IN (${IN_DEPARTMENT})`;
   const [rows] = await pool.execute(
     `SELECT id, name, email, role FROM users
-      WHERE status = 'active' AND role IN ('student', 'teacher', 'department_head')
+      WHERE status = 'active' AND role IN ('student', 'teacher', 'department_head') ${limit}
       ORDER BY name`,
+    departmentId === null ? [] : [departmentId, departmentId],
   );
   const pick = (role) => rows
     .filter((row) => row.role === role)
@@ -54,12 +79,18 @@ router.get('/candidates', asyncHandler(async (req, res) => {
 router.get('/', asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+  const departmentId = await scopeFor(pool, req.user);
   const values = [];
-  let where = '';
+  const conditions = [];
   if (req.query.cycleId) {
-    where = 'WHERE a.cycle_id = ?';
+    conditions.push('a.cycle_id = ?');
     values.push(parseId(req.query.cycleId, 'cycleId'));
   }
+  if (departmentId !== null) {
+    conditions.push('a.instructor_id IN (SELECT user_id FROM employees WHERE department_id = ?)');
+    values.push(departmentId);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const [[{ total }]] = await pool.query(
     `SELECT COUNT(*) AS total FROM evaluation_assignments a ${where}`, values,
@@ -120,6 +151,7 @@ router.post('/', asyncHandler(async (req, res) => {
     throw httpError(400, 'Choose at least one evaluator.', 'VALIDATION_ERROR');
   }
 
+  const departmentId = await scopeFor(pool, req.user);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -138,6 +170,12 @@ router.post('/', asyncHandler(async (req, res) => {
     ];
     if (input.departmentHeadId) wanted.push([input.departmentHeadId, 'department_head']);
     const userIds = [...new Set(wanted.map(([userId]) => userId))];
+    if (departmentId !== null) {
+      const allowed = await departmentUserIds(connection, departmentId);
+      if (userIds.some((userId) => !allowed.has(userId))) {
+        throw httpError(403, 'Every instructor and evaluator must belong to your department.', 'OUTSIDE_DEPARTMENT');
+      }
+    }
     const [users] = await connection.query(
       'SELECT id, role, status FROM users WHERE id IN (?)', [userIds],
     );
@@ -195,7 +233,7 @@ router.post('/', asyncHandler(async (req, res) => {
       action: 'tasks.created',
       entityType: 'evaluation_cycle',
       entityId: input.cycleId,
-      details: { instructorId: input.instructorId, courseCode: input.courseCode, created, skipped },
+      details: { instructorId: input.instructorId, courseCode: input.courseCode, created, skipped, departmentId },
       ipAddress: req.ip,
     });
     await connection.commit();
@@ -211,11 +249,12 @@ router.post('/', asyncHandler(async (req, res) => {
 // DELETE /api/tasks/:id - only tasks that nobody has started.
 router.delete('/:id', asyncHandler(async (req, res) => {
   const taskId = parseId(req.params.id, 'task ID');
+  const departmentId = await scopeFor(pool, req.user);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT a.id, a.status, cy.status AS cycle_status,
+      `SELECT a.id, a.instructor_id, a.status, cy.status AS cycle_status,
               (SELECT COUNT(*) FROM evaluations e WHERE e.assignment_id = a.id) AS evaluations
          FROM evaluation_assignments a JOIN evaluation_cycles cy ON cy.id = a.cycle_id
         WHERE a.id = ? FOR UPDATE`,
@@ -223,6 +262,11 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     );
     const task = rows[0];
     if (!task) throw httpError(404, 'Task not found.', 'NOT_FOUND');
+    if (departmentId !== null) {
+      const allowed = await departmentUserIds(connection, departmentId);
+      // Reported as "not found" so tasks of other departments are not revealed.
+      if (!allowed.has(Number(task.instructor_id))) throw httpError(404, 'Task not found.', 'NOT_FOUND');
+    }
     if (task.cycle_status === 'closed') throw httpError(409, 'This cycle is closed.', 'CYCLE_CLOSED');
     if (task.status !== 'pending' || Number(task.evaluations) > 0) {
       throw httpError(409, 'Only tasks that have not been started can be removed.', 'TASK_STARTED');

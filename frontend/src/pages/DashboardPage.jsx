@@ -100,7 +100,7 @@ function LoadingPanel() {
   );
 }
 
-export default function DashboardPage() {
+ function GeneralDashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -456,4 +456,165 @@ export default function DashboardPage() {
       )}
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* Concerned office dashboard (referral-focused)                       */
+/* ------------------------------------------------------------------ */
+
+function ConcernedOfficeDashboard() {
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await apiRequest(
+        '/improvement/referrals?page=1&pageSize=100',
+      );
+
+      setItems(response?.data?.items ?? []);
+      setTotal(Number(response?.data?.total ?? 0));
+    } catch (err) {
+      setError(err.message || 'Unable to load your referrals.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const acknowledged = items.filter((r) => r.acknowledgedAt).length;
+  const waiting = items.length - acknowledged;
+  const planned = items.reduce(
+    (sum, r) => sum + Number(r.activityCount ?? 0),
+    0,
+  );
+  const done = items.reduce(
+    (sum, r) => sum + Number(r.completedCount ?? 0),
+    0,
+  );
+
+  return (
+    <div className="space-y-8">
+      <section className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="asems-dashboard-eyebrow mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em]">
+            <span className="h-px w-6 bg-gold-500" />
+            Support planning
+          </div>
+
+          <h1 className="asems-text-primary text-2xl font-semibold tracking-tight sm:text-[30px]">
+            Referral overview
+          </h1>
+
+          <p className="asems-muted mt-2 max-w-2xl text-sm leading-6">
+            Performance gaps referred to your office, and the support and
+            capacity-building activities you have planned.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="asems-secondary-button inline-flex items-center gap-2"
+        >
+          <RefreshCw
+            size={16}
+            className={loading ? 'animate-spin' : ''}
+            aria-hidden="true"
+          />
+          {loading ? 'Refreshing…' : 'Refresh data'}
+        </button>
+      </section>
+
+      {error && (
+        <div
+          role="alert"
+          className="asems-error-panel rounded-xl border p-4 text-sm"
+        >
+          <p className="font-semibold">Referrals could not be loaded</p>
+          <p className="mt-1">{error}</p>
+        </div>
+      )}
+
+      {loading && items.length === 0 && !error ? (
+        <LoadingPanel />
+      ) : (
+        <>
+          <section
+            aria-label="Referral statistics"
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            <StatCard
+              label="Referrals received"
+              value={formatNumber(total)}
+              note="Sent to your office"
+              icon={ClipboardCheck}
+              tone="navy"
+            />
+
+            <StatCard
+              label="Waiting for acknowledgement"
+              value={formatNumber(waiting)}
+              note="Open the referral to acknowledge it"
+              icon={Clock3}
+              tone="gold"
+            />
+
+            <StatCard
+              label="Acknowledged"
+              value={formatNumber(acknowledged)}
+              note="Support planning can start"
+              icon={CheckCircle2}
+              tone="teal"
+            />
+
+            <StatCard
+              label="Activities completed"
+              value={`${formatNumber(done)} / ${formatNumber(planned)}`}
+              note="Planned support activities"
+              icon={Activity}
+              tone="slate"
+            />
+          </section>
+
+          <section className="asems-surface rounded-xl border p-5 shadow-sm sm:p-6">
+            <SectionHeading
+              title="Next step"
+              description={
+                waiting > 0
+                  ? `${formatNumber(waiting)} referral(s) are waiting for you.`
+                  : 'No referral is waiting for acknowledgement.'
+              }
+              action={
+                <DashboardLink to="/improvement">
+                  My referrals <ArrowRight size={15} />
+                </DashboardLink>
+              }
+            />
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
+export default function DashboardPage({ user }) {
+  if (user?.role === 'concerned_office') {
+    return <ConcernedOfficeDashboard />;
+  }
+
+  return <GeneralDashboard />;
 }

@@ -20,7 +20,7 @@ import resultsRoutes from './routes/results.routes.js';
 import leadershipRoutes from './routes/leadership.routes.js';
 import improvementRoutes from './routes/improvement.routes.js';
 import archiveRoutes from './routes/archive.routes.js';
-import lifecycleRoutes from './routes/lifecycle.routes.js';
+import organizationRoutes from './routes/organization.routes.js';
 const app = express();
 
 app.disable('x-powered-by');
@@ -67,7 +67,7 @@ app.use('/api/results', resultsRoutes);
 app.use('/api/leadership', leadershipRoutes);
 app.use('/api/improvement', improvementRoutes);
 app.use('/api/archive', archiveRoutes);
-app.use('/api/lifecycle', lifecycleRoutes);
+app.use('/api/organization', organizationRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

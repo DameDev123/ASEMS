@@ -12,8 +12,9 @@ import { recomputeInstructorSummary } from '../services/summaryService.js';
 //   2. An administrator may reopen a rejected form with a documented reason.
 //   3. When every assigned form is approved, the committee or department head finalizes Form E
 //      with the final comments. Only finalizing makes a summary "reviewed" (final).
-//   4. The report office records the three report copies, forwards the report to the archive,
-//      and records the archive acceptance.
+//   4. The report office records the three report copies and forwards the report to the archive.
+//      The archive office then records the three archive levels (department, college/school/institute,
+//      university) through /api/archive; the report becomes "archived" after the third.
 const router = Router();
 router.use(requireAuth);
 
@@ -35,7 +36,6 @@ const finalizeSchema = z.object({
   improvements: z.string().trim().min(1).max(10000),
 });
 const noteSchema = z.object({ note: z.string().trim().max(1000).optional().nullable() });
-const archiveSchema = z.object({ archiveReference: z.string().trim().max(120).optional().nullable() });
 
 function parseId(value, label) {
   if (!/^[1-9]\d*$/.test(String(value))) throw httpError(400, `Invalid ${label}.`, 'VALIDATION_ERROR');
@@ -325,14 +325,14 @@ router.post('/summaries/:summaryId/forward-to-archive', allowRoles(REPORT_OFFICE
   sendData(res, result);
 }));
 
-// Retired. A single "archive accepted" step used to mark the summary as archived and made the
-// three-level archive (department, college/school/institute, university) impossible to record.
-// Archival is now recorded per level through POST /api/archive/summaries/:summaryId/levels/:level.
+// Archiving is recorded per level by the archive office (see /api/archive), so the report
+// office no longer marks a report as archived in one step. The route stays so that an older
+// client receives a clear answer instead of a missing-route error.
 router.post('/summaries/:summaryId/archive', allowRoles(REPORT_OFFICE_ROLE), asyncHandler(async () => {
   throw httpError(
-    410,
-    'This step was replaced. Record archival at the department, college/school/institute and university levels on the Archive page.',
-    'ENDPOINT_RETIRED',
+    409,
+    'Archiving is now recorded per level (department, college/school/institute, university) by the archive office.',
+    'USE_ARCHIVE_LEVELS',
   );
 }));
 

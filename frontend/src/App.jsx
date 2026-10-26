@@ -20,6 +20,13 @@ import FinalEvaluationReportPage from './pages/FinalEvaluationReportPage.jsx';
 import LeadershipFormsPage from './pages/LeadershipFormsPage.jsx';
 import LeadershipAssignmentsPage from './pages/LeadershipAssignmentsPage.jsx';
 import LeadershipEvaluationsPage from './pages/LeadershipEvaluationsPage.jsx';
+import DepartmentsPage from './pages/DepartmentsPage.jsx';
+import AcademicUnitsPage from './pages/AcademicUnitsPage.jsx';
+import LeadershipHubPage from './pages/LeadershipHubPage.jsx';
+
+import ImprovementPage from './pages/ImprovementPage.jsx';
+
+
 import OfficesPage from './pages/OfficesPage.jsx';
 import ReferralsPage from './pages/ReferralsPage.jsx';
 import ArchivePage from './pages/ArchivePage.jsx';
@@ -36,18 +43,6 @@ import {
  * Replace these placeholders when their real page components exist.
  */
 const placeholderPages = [
-  {
-    path: 'departments',
-    title: 'Departments',
-    description:
-      'Maintain department records and authorized organizational scope.',
-  },
-  {
-    path: 'academic-units',
-    title: 'Academic units',
-    description:
-      'Organize colleges, schools, institutes, and academic units.',
-  },
   {
     path: 'academic',
     title: 'Courses & instructors',
@@ -86,6 +81,11 @@ const implementedPages = {
   'my-results': MyResultsPage,
   reports: ReportsWorkflowPage,
   'final-report': FinalEvaluationReportPage,
+  departments: DepartmentsPage,
+  'academic-units': AcademicUnitsPage,
+  leadership: LeadershipHubPage,
+
+   improvement: ImprovementPage,
   'leadership-forms': LeadershipFormsPage,
   'leadership-assignments': LeadershipAssignmentsPage,
   'leadership-evaluations': LeadershipEvaluationsPage,
@@ -224,7 +224,8 @@ export default function App() {
           />
         }
       >
-        <Route index element={<DashboardPage />} />
+
+<Route index element={<DashboardPage user={user} />} />
 
         {Object.entries(implementedPages).map(([path, Page]) => (
           <Route

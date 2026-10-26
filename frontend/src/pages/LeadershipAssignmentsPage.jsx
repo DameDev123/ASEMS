@@ -11,7 +11,7 @@ import {
 } from '../services/leadershipApi.js';
 import {
   EmptyBlock, ErrorBanner, LoadingBlock, Pagination, StatusPill, SuccessBanner, formatDate,
-} from './StateBlocks.jsx';
+} from '../components/StateBlocks.jsx';
 
 const PAGE_SIZE = 15;
 const TYPE_KEYS = Object.keys(LEADERSHIP_TYPES);
@@ -128,18 +128,18 @@ export default function LeadershipAssignmentsPage() {
         </label>
         <label className="block text-sm font-medium text-slate-700">Evaluator ({LEADERSHIP_TYPES[form.type].evaluator})
           <select required className={select} value={form.evaluatorId} disabled={!candidates} onChange={(e) => setForm({ ...form, evaluatorId: e.target.value })}>
-            <option value="">{candidates ? 'Select evaluator' : 'Loadingâ€¦'}</option>
+            <option value="">{candidates ? 'Select evaluator' : 'Loading…'}</option>
             {candidates?.evaluators.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </label>
         <label className="block text-sm font-medium text-slate-700">Evaluatee ({LEADERSHIP_TYPES[form.type].evaluatee})
           <select required className={select} value={form.evaluateeId} disabled={!candidates} onChange={(e) => setForm({ ...form, evaluateeId: e.target.value })}>
-            <option value="">{candidates ? 'Select evaluatee' : 'Loadingâ€¦'}</option>
-            {candidates?.evaluatees.map((u) => <option key={u.id} value={u.id}>{u.name}{u.departmentName ? ` â€” ${u.departmentName}` : ''}</option>)}
+            <option value="">{candidates ? 'Select evaluatee' : 'Loading…'}</option>
+            {candidates?.evaluatees.map((u) => <option key={u.id} value={u.id}>{u.name}{u.departmentName ? ` — ${u.departmentName}` : ''}</option>)}
           </select>
         </label>
         <div className="flex items-end">
-          <button type="submit" className="primary-button w-full" disabled={saving}>{saving ? 'Assigningâ€¦' : 'Assign evaluation'}</button>
+          <button type="submit" className="primary-button w-full" disabled={saving}>{saving ? 'Assigning…' : 'Assign evaluation'}</button>
         </div>
       </form>
 
@@ -164,7 +164,7 @@ export default function LeadershipAssignmentsPage() {
           </label>
         </div>
 
-        {loading ? <LoadingBlock label="Loading evaluationsâ€¦" /> : result.items.length === 0 ? (
+        {loading ? <LoadingBlock label="Loading evaluations…" /> : result.items.length === 0 ? (
           <EmptyBlock title="No leadership evaluations found">Assign an evaluation above, or change the filters.</EmptyBlock>
         ) : (
           <div className="overflow-x-auto">
@@ -188,7 +188,7 @@ export default function LeadershipAssignmentsPage() {
                     <td className="px-4 py-3">{formatDate(item.submittedAt)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <button type="button" className="icon-button" aria-label="View evaluation" onClick={() => navigate(`/leadership-evaluations?open=${item.id}`)}><Eye size={16} /></button>
+                        <button type="button" className="icon-button" aria-label="View evaluation" onClick={() => navigate(`/leadership?open=${item.id}`)}><Eye size={16} /></button>
                         {item.status === 'draft' && (
                           <button type="button" className="icon-button" aria-label="Remove assignment" onClick={() => remove(item)}><Trash2 size={16} /></button>
                         )}

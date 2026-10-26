@@ -59,7 +59,8 @@ function CheckList({ title, items, selected, onToggle, emptyText }) {
 }
 
 export default function TasksPage({ user }) {
-  const isAdmin = user?.role === 'admin';
+  const canManage = user?.role === 'admin' || user?.role === 'committee';
+  const isCommittee = user?.role === 'committee';
 
   const [cycles, setCycles] = useState([]);
   const [cycleFilter, setCycleFilter] = useState('');
@@ -94,15 +95,15 @@ export default function TasksPage({ user }) {
   }, [page, cycleFilter]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canManage) return;
     apiRequest('/cycles')
       .then((result) => setCycles(result?.data?.cycles ?? []))
       .catch(() => {});
-  }, [isAdmin]);
+  }, [canManage]);
 
   useEffect(() => {
-    if (isAdmin) loadTasks();
-  }, [isAdmin, loadTasks]);
+    if (canManage) loadTasks();
+  }, [canManage, loadTasks]);
 
   useEffect(() => {
     if (!dialog) return undefined;
@@ -116,12 +117,12 @@ export default function TasksPage({ user }) {
   const openCycles = useMemo(() => cycles.filter((cycle) => cycle.status !== 'closed'), [cycles]);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  if (!isAdmin) {
+  if (!canManage) {
     return (
       <section className="rounded-2xl border border-rose-100 bg-white p-8">
         <h1 className="text-xl font-semibold text-slate-900">Access restricted</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Evaluation tasks are managed by administrators. Your own assigned forms are under
+          Evaluation tasks are managed by administrators and committee members. Your own assigned forms are under
           “My evaluations”.
         </p>
       </section>
@@ -216,6 +217,7 @@ export default function TasksPage({ user }) {
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Evaluation tasks</h1>
           <p className="mt-1 text-sm text-slate-500">
             Assign eligible evaluators and track required component submissions.
+            {isCommittee && ' You can manage tasks for your own department only.'}
           </p>
         </div>
         <div className="flex gap-2">
