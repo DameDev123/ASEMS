@@ -151,6 +151,10 @@ const academicVpGroups = [
     label: 'OVERVIEW',
     items: [{ label: 'Dashboard', to: '/', icon: LayoutDashboard }],
   },
+  {
+    label: 'REPORTING',
+    items: [{ label: 'Reports & workflow', to: '/reports', icon: ChartNoAxesCombined }],
+  },
   leadershipEvaluatorGroup,
 ];
 
