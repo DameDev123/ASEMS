@@ -606,6 +606,369 @@ function ConcernedOfficeDashboard() {
     </div>
   );
 }
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* Dean, Academic VP and Department Head dashboards                    */
+/* ------------------------------------------------------------------ */
+
+const EMPTY_DATA = { evaluations: [], summaries: [], referrals: [] };
+
+const SUMMARY_PILL = {
+  complete: 'status-blue',
+  reviewed: 'status-green',
+  archived: 'status-gray',
+  incomplete: 'status-amber',
+};
+
+const ROLE_COPY = {
+  dean: {
+    eyebrow: 'College administration',
+    title: 'Dean overview',
+    text: 'Your leadership evaluations of department heads, the final reports of your college, and the improvement referrals that follow them.',
+  },
+  academic_vp: {
+    eyebrow: 'Academic Affairs',
+    title: 'Academic Affairs VP overview',
+    text: 'Your leadership evaluations of deans, and the final reports that colleges forwarded to your office.',
+  },
+  department_head: {
+    eyebrow: 'Department',
+    title: 'Department head overview',
+    text: 'Final summaries of your department and the improvement referrals you sent to the concerned offices.',
+  },
+};
+
+const countBy = (items, predicate) => items.filter(predicate).length;
+
+async function fetchItems(path) {
+  const response = await apiRequest(path);
+  return response?.data?.items ?? [];
+}
+
+function SimpleTable({ title, description, action, columns, rows, empty }) {
+  return (
+    <section className="asems-surface overflow-hidden rounded-xl border shadow-sm">
+      <div className="p-5 sm:p-6">
+        <SectionHeading
+          title={title}
+          description={description}
+          action={action}
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="asems-dashboard-table min-w-full text-left text-sm">
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th key={column.key} className="px-5 py-3">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className="asems-table-secondary px-5 py-4"
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="asems-muted px-5 py-10 text-center text-sm"
+                >
+                  {empty}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function RoleDashboard({ role }) {
+  const copy = ROLE_COPY[role];
+  const usesLeadership = role === 'dean' || role === 'academic_vp';
+  const usesReferrals = role === 'dean' || role === 'department_head';
+
+  const [data, setData] = useState(EMPTY_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    const jobs = [
+      ['evaluations', usesLeadership ? '/leadership/evaluations?pageSize=100' : null],
+      ['summaries', '/reports/summaries?limit=100'],
+      ['referrals', usesReferrals ? '/improvement/referrals?pageSize=100' : null],
+    ];
+
+    const results = await Promise.allSettled(
+      jobs.map(([, path]) => (path ? fetchItems(path) : Promise.resolve([]))),
+    );
+
+    const next = { ...EMPTY_DATA };
+    const failures = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        next[jobs[index][0]] = result.value;
+      } else {
+        failures.push(result.reason?.message || 'A request failed.');
+      }
+    });
+
+    setData(next);
+    setError(failures[0] || '');
+    setLoading(false);
+  }, [usesLeadership, usesReferrals]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const { evaluations, summaries, referrals } = data;
+
+  const draftEvaluations = countBy(evaluations, (item) => item.status === 'draft');
+  const submittedEvaluations = countBy(evaluations, (item) => item.status === 'submitted');
+
+  const byStatus = (status) =>
+    countBy(summaries, (item) => String(item.status || '').toLowerCase() === status);
+  const readyToFinalize = byStatus('complete');
+  const incomplete = byStatus('incomplete');
+  const reviewed = byStatus('reviewed');
+  const archived = byStatus('archived');
+
+  const waitingReferrals = countBy(referrals, (item) => !item.acknowledgedAt);
+
+  let cards = [];
+  let steps = [];
+
+  if (role === 'dean') {
+    cards = [
+      { label: 'Leadership evaluations', value: evaluations.length, note: `${submittedEvaluations} submitted`, icon: ClipboardCheck, tone: 'navy' },
+      { label: 'Drafts to finish', value: draftEvaluations, note: 'Saved but not submitted', icon: Clock3, tone: 'gold' },
+      { label: 'Reviewed reports', value: reviewed, note: `${archived} archived`, icon: CheckCircle2, tone: 'teal' },
+      { label: 'Referrals', value: referrals.length, note: `${waitingReferrals} waiting for the office`, icon: Activity, tone: 'slate' },
+    ];
+    if (draftEvaluations > 0) {
+      steps.push({ text: `Finish ${draftEvaluations} leadership evaluation(s)`, to: '/leadership' });
+    }
+    if (reviewed > 0) {
+      steps.push({ text: `${reviewed} reviewed report(s): forward them to the Academic Affairs VP office`, to: '/reports' });
+    }
+  } else if (role === 'academic_vp') {
+    cards = [
+      { label: 'Leadership evaluations', value: evaluations.length, note: `${submittedEvaluations} submitted`, icon: ClipboardCheck, tone: 'navy' },
+      { label: 'Drafts to finish', value: draftEvaluations, note: 'Saved but not submitted', icon: Clock3, tone: 'gold' },
+      { label: 'Reports received', value: summaries.length, note: `${archived} archived`, icon: CheckCircle2, tone: 'teal' },
+      { label: 'Awaiting copies or archive', value: reviewed, note: 'Record the three report copies', icon: Activity, tone: 'slate' },
+    ];
+    if (draftEvaluations > 0) {
+      steps.push({ text: `Finish ${draftEvaluations} leadership evaluation(s)`, to: '/leadership' });
+    }
+    if (reviewed > 0) {
+      steps.push({ text: `${reviewed} report(s) need the teacher, department and college copies`, to: '/reports' });
+    }
+  } else {
+    cards = [
+      { label: 'Ready to finalize', value: readyToFinalize, note: 'All forms approved', icon: ClipboardCheck, tone: 'navy' },
+      { label: 'Incomplete', value: incomplete, note: 'Waiting for approved forms', icon: Clock3, tone: 'gold' },
+      { label: 'Reviewed', value: reviewed, note: `${archived} archived`, icon: CheckCircle2, tone: 'teal' },
+      { label: 'Referrals sent', value: referrals.length, note: `${waitingReferrals} waiting for the office`, icon: Activity, tone: 'slate' },
+    ];
+    if (readyToFinalize > 0) {
+      steps.push({ text: `${readyToFinalize} summary(ies) are ready for the final Form E comments`, to: '/reports' });
+    }
+    if (waitingReferrals > 0) {
+      steps.push({ text: `${waitingReferrals} referral(s) are waiting for the concerned office`, to: '/improvement' });
+    }
+  }
+
+  const evaluationColumns = [
+    { key: 'who', label: 'Evaluatee', render: (row) => row.evaluateeName || '—' },
+    { key: 'cycle', label: 'Evaluation cycle', render: (row) => row.cycleTitle || '—' },
+    { key: 'progress', label: 'Progress', render: (row) => `${row.answeredCriteria ?? 0} / ${row.totalCriteria ?? 0}` },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (row) => (
+        <span className={`status-pill ${statusClass(row.status)}`}>
+          {row.status || 'Unknown'}
+        </span>
+      ),
+    },
+  ];
+
+  const summaryColumns = [
+    { key: 'who', label: 'Instructor', render: (row) => row.instructor_name || '—' },
+    { key: 'cycle', label: 'Evaluation cycle', render: (row) => row.cycle_title || '—' },
+    {
+      key: 'total',
+      label: 'Total / 100',
+      render: (row) =>
+        ['complete', 'reviewed', 'archived'].includes(String(row.status || '').toLowerCase())
+          ? Number(row.total_score ?? 0).toFixed(2)
+          : '—',
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (row) => {
+        const status = String(row.status || '').toLowerCase();
+        return (
+          <span className={`status-pill ${SUMMARY_PILL[status] || 'status-gray'}`}>
+            {status || 'unknown'}
+          </span>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="space-y-8">
+      <section className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="asems-dashboard-eyebrow mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em]">
+            <span className="h-px w-6 bg-gold-500" />
+            {copy.eyebrow}
+          </div>
+
+          <h1 className="asems-text-primary text-2xl font-semibold tracking-tight sm:text-[30px]">
+            {copy.title}
+          </h1>
+
+          <p className="asems-muted mt-2 max-w-2xl text-sm leading-6">
+            {copy.text}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="asems-secondary-button inline-flex items-center gap-2"
+        >
+          <RefreshCw
+            size={16}
+            className={loading ? 'animate-spin' : ''}
+            aria-hidden="true"
+          />
+          {loading ? 'Refreshing…' : 'Refresh data'}
+        </button>
+      </section>
+
+      {error && (
+        <div
+          role="alert"
+          className="asems-error-panel rounded-xl border p-4 text-sm"
+        >
+          <p className="font-semibold">Some dashboard data could not be loaded</p>
+          <p className="mt-1">{error}</p>
+        </div>
+      )}
+
+      {loading && evaluations.length === 0 && summaries.length === 0 && referrals.length === 0 && !error ? (
+        <LoadingPanel />
+      ) : (
+        <>
+          <section
+            aria-label="Overview statistics"
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            {cards.map((card) => (
+              <StatCard
+                key={card.label}
+                label={card.label}
+                value={formatNumber(card.value)}
+                note={card.note}
+                icon={card.icon}
+                tone={card.tone}
+              />
+            ))}
+          </section>
+
+          <section className="asems-surface rounded-xl border p-5 shadow-sm sm:p-6">
+            <SectionHeading
+              title="Next steps"
+              description={
+                steps.length > 0
+                  ? 'Work that is waiting for you.'
+                  : 'Nothing is waiting for you right now.'
+              }
+            />
+
+            {steps.length > 0 && (
+              <ul className="divide-y divide-[var(--asems-border)]">
+                {steps.map((step) => (
+                  <li
+                    key={step.text}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <span className="asems-text-primary text-sm">{step.text}</span>
+                    <DashboardLink to={step.to}>
+                      Open <ArrowRight size={15} />
+                    </DashboardLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {usesLeadership ? (
+            <SimpleTable
+              title="My leadership evaluations"
+              description="Evaluations assigned to you by the administrator"
+              action={
+                <DashboardLink to="/leadership">
+                  View all <ArrowRight size={15} />
+                </DashboardLink>
+              }
+              columns={evaluationColumns}
+              rows={evaluations.slice(0, 5)}
+              empty="No leadership evaluation has been assigned to you yet."
+            />
+          ) : (
+            <SimpleTable
+              title="Recent summaries"
+              description="Latest final evaluation summaries of your department"
+              action={
+                <DashboardLink to="/reports">
+                  View all <ArrowRight size={15} />
+                </DashboardLink>
+              }
+              columns={summaryColumns}
+              rows={summaries.slice(0, 5)}
+              empty="No evaluation summary is available yet."
+            />
+          )}
+
+          <p className="asems-muted text-xs">
+            Figures are counted from the most recent 100 records returned by the backend.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -614,6 +977,10 @@ function ConcernedOfficeDashboard() {
 export default function DashboardPage({ user }) {
   if (user?.role === 'concerned_office') {
     return <ConcernedOfficeDashboard />;
+  }
+
+  if (['dean', 'academic_vp', 'department_head'].includes(user?.role)) {
+    return <RoleDashboard key={user.role} role={user.role} />;
   }
 
   return <GeneralDashboard />;
