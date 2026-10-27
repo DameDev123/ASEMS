@@ -9,7 +9,8 @@ import { getFormESummary } from '../services/formEReportService.js';
 const router = Router();
 router.use(requireAuth);
 
-const REPORT_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management'];
+const REPORT_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management', 'academic_vp'];
+
 const SUMMARY_STATUSES = ['incomplete', 'complete', 'reviewed', 'archived'];
 
 function parsePositiveInteger(value, label, fallback = null) {
@@ -28,23 +29,21 @@ function buildScope(role, userId, clauses, values) {
       WHERE viewer.user_id = ? AND target.user_id = s.instructor_id
         AND viewer.department_id IS NOT NULL
     )`);
-    values.push(Number(userId));
-  } else if (role === 'dean') {
+
+
+
+      values.push(Number(userId));
+  } else if (role === 'academic_vp') {
+    // The VP office only sees summaries that the college administration forwarded to it.
     clauses.push(`EXISTS (
-      SELECT 1
-        FROM employees viewer
-        JOIN departments viewer_department ON viewer_department.id = viewer.department_id
-        JOIN employees target ON target.user_id = s.instructor_id
-        JOIN departments target_department ON target_department.id = target.department_id
-       WHERE viewer.user_id = ?
-         AND viewer.department_id IS NOT NULL
-         AND viewer_department.faculty_id = target_department.faculty_id
+      SELECT 1 FROM evaluation_report_routing vp_routing
+       WHERE vp_routing.summary_id = s.id
+         AND (vp_routing.forwarded_to_vp_at IS NOT NULL OR vp_routing.forwarded_at IS NOT NULL)
     )`);
-    values.push(Number(userId));
   }
 }
+async function assertSummaryScope(connection, user, instructorId, summaryId = null) {
 
-async function assertSummaryScope(connection, user, instructorId) {
   if (user.role === 'department_head') {
     const [rows] = await connection.execute(
       `SELECT EXISTS (
@@ -55,7 +54,19 @@ async function assertSummaryScope(connection, user, instructorId) {
       [Number(user.id), Number(instructorId)],
     );
     if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
-  } else if (user.role === 'dean') {
+  } 
+   else if (user.role === 'academic_vp') {
+    const [rows] = await connection.execute(
+      `SELECT EXISTS (
+         SELECT 1 FROM evaluation_report_routing r
+          WHERE r.summary_id = ? AND (r.forwarded_to_vp_at IS NOT NULL OR r.forwarded_at IS NOT NULL)
+       ) AS allowed`,
+      [Number(summaryId)],
+    );
+    if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
+  }
+  
+  else if (user.role === 'dean') {
     const [rows] = await connection.execute(
       `SELECT EXISTS (
          SELECT 1
@@ -71,6 +82,9 @@ async function assertSummaryScope(connection, user, instructorId) {
     if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
   }
 }
+
+
+
 
 // GET /api/reports/summaries?page=1&limit=25&cycleId=&academicYear=&departmentId=&facultyId=&instructorId=&status=&search=
 router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, res) => {
@@ -204,7 +218,7 @@ router.get('/summaries/:id/form-e', allowRoles(...REPORT_ROLES), asyncHandler(as
       [summaryId],
     );
     if (!rows[0]) throw httpError(404, 'Report not found.', 'NOT_FOUND');
-    await assertSummaryScope(connection, req.user, rows[0].instructor_id);
+        await assertSummaryScope(connection, req.user, rows[0].instructor_id, summaryId);    
     const report = await getFormESummary(connection, summaryId);
     sendData(res, report);
   } finally {
