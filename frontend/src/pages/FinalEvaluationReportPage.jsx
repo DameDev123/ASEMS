@@ -1,9 +1,7 @@
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   FileDown,
-  Printer,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -49,6 +47,47 @@ function formatScore(value) {
     : number.toFixed(2);
 }
 
+// A component without an average is shown as unavailable, never as 0.00.
+function formatWeighted(average, weighted) {
+  return numberOrNull(average) === null ? '—' : formatScore(weighted);
+}
+
+function isFinalStatus(status) {
+  return ['complete', 'reviewed', 'archived'].includes(
+    String(status || '').toLowerCase(),
+  );
+}
+
+// The total of an incomplete summary is not a final score.
+function formatFinalScore(row) {
+  return isFinalStatus(row.status) ? formatScore(row.total_score) : '—';
+}
+
+// Short reason shown under the "Incomplete" badge.
+function incompleteReason(row) {
+  if (isFinalStatus(row.status)) return '';
+
+  const averages = {
+    student: row.student_average,
+    department_head: row.department_head_average,
+    peer: row.peer_average,
+    self: row.self_average,
+  };
+  const missing = COMPONENTS.filter(
+    (component) => numberOrNull(averages[component.key]) === null,
+  ).map((component) => component.label);
+
+  if (missing.length) return `No result yet: ${missing.join(', ')}`;
+
+  const total = Number(row.total_assignments ?? 0);
+  const approved = Number(row.approved_assignments ?? 0);
+  if (total > 0 && approved < total) {
+    return `Awaiting approval: ${approved} of ${total} forms approved`;
+  }
+
+  return 'Awaiting final review';
+}
+
 function formatDate(value) {
   if (!value) return '—';
 
@@ -82,7 +121,6 @@ function getRows(response) {
   return candidates.find(Array.isArray) ?? [];
 }
 
-
 function getCycles(rows) {
   const unique = new Map();
 
@@ -113,9 +151,7 @@ function getInstructors(rows) {
     }
   });
 
-  return [...unique.values()].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function ScoreCard({ label, value, note }) {
@@ -164,11 +200,8 @@ export default function FinalEvaluationReportPage({ user }) {
     else setLoading(true);
 
     try {
-     
-       const response = await apiRequest('/reports/summaries');
-         setRows(getRows(response));
-    
-    
+      const response = await apiRequest('/reports/summaries?limit=100');
+      setRows(getRows(response));
     } catch (err) {
       setError(err.message || 'Unable to load final evaluation reports.');
     } finally {
@@ -577,33 +610,53 @@ export default function FinalEvaluationReportPage({ user }) {
                           <td className="border border-slate-200 px-3 py-3 tabular-nums">
                             {formatScore(row.student_average)}
                             <p className="mt-1 text-slate-500">
-                              Weighted: {formatScore(row.student_weighted)}
+                              Weighted:{' '}
+                              {formatWeighted(
+                                row.student_average,
+                                row.student_weighted,
+                              )}
                             </p>
                           </td>
                           <td className="border border-slate-200 px-3 py-3 tabular-nums">
                             {formatScore(row.department_head_average)}
                             <p className="mt-1 text-slate-500">
                               Weighted:{' '}
-                              {formatScore(row.department_head_weighted)}
+                              {formatWeighted(
+                                row.department_head_average,
+                                row.department_head_weighted,
+                              )}
                             </p>
                           </td>
                           <td className="border border-slate-200 px-3 py-3 tabular-nums">
                             {formatScore(row.peer_average)}
                             <p className="mt-1 text-slate-500">
-                              Weighted: {formatScore(row.peer_weighted)}
+                              Weighted:{' '}
+                              {formatWeighted(
+                                row.peer_average,
+                                row.peer_weighted,
+                              )}
                             </p>
                           </td>
                           <td className="border border-slate-200 px-3 py-3 tabular-nums">
                             {formatScore(row.self_average)}
                             <p className="mt-1 text-slate-500">
-                              Weighted: {formatScore(row.self_weighted)}
+                              Weighted:{' '}
+                              {formatWeighted(
+                                row.self_average,
+                                row.self_weighted,
+                              )}
                             </p>
                           </td>
                           <td className="border border-slate-200 px-3 py-3 text-sm font-extrabold tabular-nums text-slate-900">
-                            {formatScore(row.total_score)}
+                            {formatFinalScore(row)}
                           </td>
                           <td className="border border-slate-200 px-3 py-3">
                             <StatusBadge status={row.status} />
+                            {incompleteReason(row) && (
+                              <p className="mt-1 text-slate-500">
+                                {incompleteReason(row)}
+                              </p>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -628,8 +681,7 @@ export default function FinalEvaluationReportPage({ user }) {
                     : ''}
                 </p>
                 <p className="mt-1 text-sm text-slate-700">
-                  <strong>Final score:</strong>{' '}
-                  {formatScore(selectedRow.total_score)}
+                  <strong>Final score:</strong> {formatFinalScore(selectedRow)}
                 </p>
                 <p className="mt-1 text-sm text-slate-700">
                   <strong>Workflow status:</strong>{' '}
@@ -659,8 +711,9 @@ export default function FinalEvaluationReportPage({ user }) {
               </div>
               <p className="mt-3 text-xs leading-5 text-slate-500">
                 Final scores and weighted components are displayed from the
-                backend summary records. Missing component values are shown as
-                unavailable; they are not replaced with zero.
+                backend summary records. Missing component values, and the
+                final score of an incomplete record, are shown as "—"; they
+                are not replaced with zero.
               </p>
             </section>
 
