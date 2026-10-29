@@ -20,7 +20,6 @@ function parsePositiveInteger(value, label, fallback = null) {
   if (!Number.isSafeInteger(parsed)) throw httpError(400, `Invalid ${label}.`, 'VALIDATION_ERROR');
   return parsed;
 }
-
 function buildScope(role, userId, clauses, values) {
   if (role === 'department_head') {
     clauses.push(`EXISTS (
@@ -29,10 +28,20 @@ function buildScope(role, userId, clauses, values) {
       WHERE viewer.user_id = ? AND target.user_id = s.instructor_id
         AND viewer.department_id IS NOT NULL
     )`);
-
-
-
-      values.push(Number(userId));
+    values.push(Number(userId));
+  } else if (role === 'dean' || role === 'management') {
+    // The college / school administration sees only the summaries of its own college.
+    clauses.push(`EXISTS (
+      SELECT 1
+        FROM employees viewer
+        JOIN departments viewer_department ON viewer_department.id = viewer.department_id
+        JOIN employees target ON target.user_id = s.instructor_id
+        JOIN departments target_department ON target_department.id = target.department_id
+       WHERE viewer.user_id = ?
+         AND viewer.department_id IS NOT NULL
+         AND viewer_department.faculty_id = target_department.faculty_id
+    )`);
+    values.push(Number(userId));
   } else if (role === 'academic_vp') {
     // The VP office only sees summaries that the college administration forwarded to it.
     clauses.push(`EXISTS (
@@ -42,8 +51,8 @@ function buildScope(role, userId, clauses, values) {
     )`);
   }
 }
-async function assertSummaryScope(connection, user, instructorId, summaryId = null) {
 
+async function assertSummaryScope(connection, user, instructorId, summaryId = null) {
   if (user.role === 'department_head') {
     const [rows] = await connection.execute(
       `SELECT EXISTS (
@@ -54,19 +63,7 @@ async function assertSummaryScope(connection, user, instructorId, summaryId = nu
       [Number(user.id), Number(instructorId)],
     );
     if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
-  } 
-   else if (user.role === 'academic_vp') {
-    const [rows] = await connection.execute(
-      `SELECT EXISTS (
-         SELECT 1 FROM evaluation_report_routing r
-          WHERE r.summary_id = ? AND (r.forwarded_to_vp_at IS NOT NULL OR r.forwarded_at IS NOT NULL)
-       ) AS allowed`,
-      [Number(summaryId)],
-    );
-    if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
-  }
-  
-  else if (user.role === 'dean') {
+  } else if (user.role === 'dean' || user.role === 'management') {
     const [rows] = await connection.execute(
       `SELECT EXISTS (
          SELECT 1
@@ -80,9 +77,17 @@ async function assertSummaryScope(connection, user, instructorId, summaryId = nu
       [Number(instructorId), Number(user.id)],
     );
     if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
+  } else if (user.role === 'academic_vp') {
+    const [rows] = await connection.execute(
+      `SELECT EXISTS (
+         SELECT 1 FROM evaluation_report_routing r
+          WHERE r.summary_id = ? AND (r.forwarded_to_vp_at IS NOT NULL OR r.forwarded_at IS NOT NULL)
+       ) AS allowed`,
+      [Number(summaryId)],
+    );
+    if (Number(rows[0]?.allowed) !== 1) throw httpError(404, 'Report not found.', 'NOT_FOUND');
   }
 }
-
 
 
 
@@ -151,6 +156,7 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
             s.department_head_average, s.department_head_weighted,
             s.peer_average, s.peer_weighted, s.self_average, s.self_weighted,
             s.total_score, s.status, s.finalized_by, s.finalized_at,
+                        (rt.forwarded_to_vp_at IS NOT NULL OR rt.forwarded_at IS NOT NULL) AS forwarded_to_vp,
             COALESCE(stats.total_assignments, 0) AS total_assignments,
             COALESCE(stats.submitted_assignments, 0) AS submitted_assignments,
             COALESCE(stats.approved_assignments, 0) AS approved_assignments,
@@ -163,9 +169,13 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
        JOIN users u ON u.id = s.instructor_id
        LEFT JOIN employees emp ON emp.user_id = s.instructor_id
        LEFT JOIN departments d ON d.id = emp.department_id
-       LEFT JOIN faculties fac ON fac.id = d.faculty_id
+           LEFT JOIN faculties fac ON fac.id = d.faculty_id
+       LEFT JOIN evaluation_report_routing rt ON rt.summary_id = s.id
        LEFT JOIN (
          SELECT a.cycle_id, a.instructor_id,
+
+
+
                 COUNT(*) AS total_assignments,
                 COALESCE(SUM(e.status IN ('submitted', 'approved')), 0) AS submitted_assignments,
                 COALESCE(SUM(e.status = 'approved'), 0) AS approved_assignments,
@@ -193,6 +203,7 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
       submitted_assignments: Number(row.submitted_assignments),
       approved_assignments: Number(row.approved_assignments),
       all_evaluations_approved: Number(row.all_evaluations_approved) === 1,
+            forwarded_to_vp: Number(row.forwarded_to_vp) === 1,
       student_average: row.student_average === null ? null : Number(row.student_average),
       student_weighted: Number(row.student_weighted),
       department_head_average: row.department_head_average === null ? null : Number(row.department_head_average),
