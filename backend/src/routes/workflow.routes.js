@@ -37,8 +37,8 @@ const CHAIN_ROLES = [
   'management',
   'academic_vp',
 ];
+const FORWARD_TO_VP_ROLES = ['management', 'dean', 'admin'];
 
-const FORWARD_TO_VP_ROLES = ['dean', 'admin'];
 const VP_OFFICE_ROLES = ['academic_vp', 'admin'];
 
 const ARCHIVE_LEVEL_KEYS = {
@@ -122,7 +122,7 @@ async function assertChainScope(db, user, instructorId) {
     return;
   }
 
-  if (user.role !== 'dean') return;
+   if (user.role !== 'dean' && user.role !== 'management') return;
 
   const [rows] = await db.execute(
     `SELECT 1 AS ok
