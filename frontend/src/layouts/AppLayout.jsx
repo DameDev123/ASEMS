@@ -41,7 +41,6 @@ const adminGroups = [
     items: [
       { label: 'Evaluation cycles', to: '/cycles', icon: CalendarDays },
       { label: 'Official forms', to: '/forms', icon: ClipboardList },
-      { label: 'Evaluation tasks', to: '/tasks', icon: ClipboardCheck },
     ],
   },
   {
@@ -55,19 +54,6 @@ const adminGroups = [
   {
     label: 'REPORTING',
     items: [
-      {
-        label: 'Reports & workflow',
-        to: '/reports',
-        icon: ChartNoAxesCombined,
-      },
-
-
-      {
-  label: 'Final Evaluation Report',
-  to: '/final-report',
-  icon: FileText,
-},
-
       { label: 'Audit trail', to: '/audit', icon: ShieldCheck },
     ],
   },

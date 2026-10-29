@@ -42,8 +42,8 @@ function effectiveStatus(row) {
   return row.evaluation_status ?? row.status;
 }
 
-function isEditable(row) {
-  return row.cycle_status === 'active' && EDITABLE.includes(row.evaluation_status ?? null);
+function isEditable(row, readOnly = false) {
+  return !readOnly && row.cycle_status === 'active' && EDITABLE.includes(row.evaluation_status ?? null);
 }
 
 function formatRole(role) {
@@ -110,7 +110,7 @@ function StatTile({ label, value, hint }) {
   );
 }
 
-function EvaluationForm({ assignmentId, onBack }) {
+function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
   const [assignment, setAssignment] = useState(null);
   const [version, setVersion] = useState(null);
   const [scores, setScores] = useState({});
@@ -162,7 +162,7 @@ function EvaluationForm({ assignmentId, onBack }) {
     () => computeScore(criteria, scores, weight, version?.scaleMax),
     [criteria, scores, weight, version],
   );
-  const editable = Boolean(assignment) && isEditable(assignment);
+  const editable = Boolean(assignment) && isEditable(assignment, readOnly);
   const remaining = criteria.length - stats.answered;
   const progress = criteria.length ? Math.round((stats.answered / criteria.length) * 100) : 0;
 
@@ -420,13 +420,15 @@ function EvaluationForm({ assignmentId, onBack }) {
         </div>
       </div>
 
-      {!editable && (
+           {!editable && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {assignment.cycle_status !== 'active'
-            ? 'This evaluation cycle is not active, so the form is read-only.'
-            : `This evaluation is ${STATUS_LABEL[status]?.toLowerCase() ?? status}${
-              assignment.submitted_at ? ` (submitted ${new Date(assignment.submitted_at).toLocaleString()})` : ''
-            } and can no longer be edited.`}
+          {readOnly
+            ? 'Administrators can view evaluations but cannot fill them in on behalf of an evaluator.'
+            : assignment.cycle_status !== 'active'
+              ? 'This evaluation cycle is not active, so the form is read-only.'
+              : `This evaluation is ${STATUS_LABEL[status]?.toLowerCase() ?? status}${
+                assignment.submitted_at ? ` (submitted ${new Date(assignment.submitted_at).toLocaleString()})` : ''
+              } and can no longer be edited.`}
         </div>
       )}
       {(status === 'returned' || status === 'rejected') && editable && (
@@ -604,8 +606,15 @@ export default function MyEvaluationsPage({ user }) {
   const [cycle, setCycle] = useState('');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState(null);
+  // Administrators oversee evaluations but never fill them in for an evaluator.
+  const readOnly = user?.role === 'admin';
 
   const load = useCallback(async () => {
+    // Administrators are not evaluators: they do not load anyone's evaluations.
+    if (readOnly) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -616,7 +625,7 @@ export default function MyEvaluationsPage({ user }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -642,13 +651,14 @@ export default function MyEvaluationsPage({ user }) {
       .filter((row) => matchesFilter(row, filter))
       .filter((row) => !cycle || String(row.cycle_id) === cycle)
       .filter((row) => !text || `${row.instructor_name} ${row.course_title} ${row.course_code}`.toLowerCase().includes(text))
-      .sort((a, b) => Number(isEditable(b)) - Number(isEditable(a)));
-  }, [rows, filter, cycle, query]);
+          .sort((a, b) => Number(isEditable(b, readOnly)) - Number(isEditable(a, readOnly)));
+  }, [rows, filter, cycle, query, readOnly]);
 
   if (openId) {
     return (
       <EvaluationForm
         assignmentId={openId}
+        readOnly={readOnly}
         onBack={() => { setOpenId(null); load(); }}
       />
     );
@@ -665,6 +675,18 @@ export default function MyEvaluationsPage({ user }) {
     ['approved', 'Approved'],
   ];
 
+  if (readOnly) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-8">
+        <h1 className="text-xl font-semibold text-slate-900">Not available for administrators</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Evaluations are filled in and read only by the evaluators and the offices that receive their results.
+          Administrators can follow progress per cycle under “Evaluation tasks”.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -672,8 +694,18 @@ export default function MyEvaluationsPage({ user }) {
           <p className="text-sm font-medium text-slate-500">Evaluations</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">My evaluations</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Evaluating as <strong className="font-semibold text-slate-700">{formatRole(user?.role) || 'evaluator'}</strong>.
-            Open a form to answer, track your live score and submit.
+            {readOnly ? (
+              <>
+                Overview of every assigned evaluation, shown as{' '}
+                <strong className="font-semibold text-slate-700">{formatRole(user?.role)}</strong> (read-only).
+                Administrators cannot fill evaluations in.
+              </>
+            ) : (
+              <>
+                Evaluating as <strong className="font-semibold text-slate-700">{formatRole(user?.role) || 'evaluator'}</strong>.
+                Open a form to answer, track your live score and submit.
+              </>
+            )}
           </p>
         </div>
         <button type="button" onClick={load} disabled={loading} className={SECONDARY_BUTTON}>
@@ -778,7 +810,7 @@ export default function MyEvaluationsPage({ user }) {
               <tbody className="divide-y divide-slate-100">
                 {visible.map((row) => {
                   const status = effectiveStatus(row);
-                  const canEdit = isEditable(row);
+                  const canEdit = isEditable(row, readOnly);
                   return (
                     <tr key={row.id} className="hover:bg-slate-50/60">
                       <td className="px-5 py-4 font-medium text-slate-900">{row.instructor_name}</td>

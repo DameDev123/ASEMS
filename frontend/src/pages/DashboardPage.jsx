@@ -386,7 +386,7 @@ function GeneralDashboard({ user }) {
                     <DashboardLink to="/my-evaluations">
                       Open my evaluations <ArrowRight size={15} />
                     </DashboardLink>
-                  ) : (
+                  ) : user?.role === 'admin' ? null : (
                     <DashboardLink to="/tasks">
                       View tasks <ArrowRight size={15} />
                     </DashboardLink>
