@@ -42,7 +42,6 @@ const adminGroups = [
       { label: 'Evaluation cycles', to: '/cycles', icon: CalendarDays },
       { label: 'Official forms', to: '/forms', icon: ClipboardList },
       { label: 'Evaluation tasks', to: '/tasks', icon: ClipboardCheck },
-      { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
     ],
   },
   {
@@ -158,7 +157,7 @@ const academicVpGroups = [
   leadershipEvaluatorGroup,
 ];
 
-// Committee members assign evaluators for their own department (enforced by the API).
+// Committee members and department heads assign evaluators for their own department (enforced by the API).
 const participationGroup = {
   label: 'PARTICIPATION',
   items: [
@@ -244,7 +243,7 @@ function getNavigationGroups(role) {
       return [...managementGroups, participationGroup, improvementGroup];
 
     case 'department_head':
-      return [...managementGroups, improvementGroup];
+      return [...managementGroups, participationGroup, improvementGroup];
 
     case 'management':
       return managementGroups;
