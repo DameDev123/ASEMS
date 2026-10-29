@@ -182,6 +182,13 @@ export async function updateDepartment(user, departmentId, body, ipAddress) {
 
 export async function deleteDepartment(user, departmentId, ipAddress) {
   return inTransaction(async (connection) => {
+         const [[{ courseTotal }]] = await connection.execute(
+      'SELECT COUNT(*) AS courseTotal FROM courses WHERE department_id = ? OR department = ?',
+      [departmentId, department.name],
+    );
+    if (num(courseTotal) > 0) {
+      throw httpError(409, 'This department still owns courses. Move them to another department first.', 'HAS_COURSES');
+    }
     const [[department]] = await connection.execute('SELECT id, name FROM departments WHERE id = ? FOR UPDATE', [departmentId]);
     if (!department) throw httpError(404, 'Department not found.', 'NOT_FOUND');
     const [[{ total }]] = await connection.execute('SELECT COUNT(*) AS total FROM employees WHERE department_id = ?', [departmentId]);

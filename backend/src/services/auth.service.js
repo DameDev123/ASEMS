@@ -128,3 +128,85 @@ export async function getCurrentUser(userId) {
 
   return publicUser(rows[0]);
 }
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(12).max(128),
+});
+
+export async function changePassword(userId, input, ipAddress = null) {
+  const parsed = changePasswordSchema.safeParse(input ?? {});
+
+  if (!parsed.success) {
+    fail('The new password must be between 12 and 128 characters.', 400, 'VALIDATION_ERROR');
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+
+  if (currentPassword === newPassword) {
+    fail('The new password must be different from the current password.', 400, 'VALIDATION_ERROR');
+  }
+
+  const [rows] = await pool.execute(
+    'SELECT id, password, status FROM users WHERE id = ? LIMIT 1',
+    [Number(userId)],
+  );
+  const user = rows[0];
+
+  if (!user || user.status !== 'active') {
+    fail('User not found or account unavailable.', 404, 'USER_NOT_FOUND');
+  }
+
+  // 400 (not 401) so the browser does not discard the session.
+  const matches = await bcrypt.compare(currentPassword, user.password);
+
+  if (!matches) {
+    fail('The current password is incorrect.', 400, 'INVALID_CURRENT_PASSWORD');
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await pool.execute('UPDATE users SET password = ? WHERE id = ?', [passwordHash, user.id]);
+
+  await writeAudit(pool, {
+    userId: user.id,
+    action: 'auth.password_changed',
+    entityType: 'user',
+    entityId: user.id,
+    details: {},
+    ipAddress,
+  });
+
+  return { changed: true };
+}
+
+const profileSchema = z.object({
+  phone: z.string().trim().max(30).nullable(),
+  address: z.string().trim().max(255).nullable(),
+});
+
+export async function updateProfile(userId, input, ipAddress = null) {
+  const parsed = profileSchema.safeParse(input ?? {});
+
+  if (!parsed.success) {
+    fail('Please enter a valid phone number (up to 30 characters) and address.', 400, 'VALIDATION_ERROR');
+  }
+
+  const phone = parsed.data.phone || null;
+  const address = parsed.data.address || null;
+
+  await pool.execute(
+    'UPDATE users SET phone = ?, address = ? WHERE id = ?',
+    [phone, address, Number(userId)],
+  );
+
+  await writeAudit(pool, {
+    userId: Number(userId),
+    action: 'auth.profile_updated',
+    entityType: 'user',
+    entityId: Number(userId),
+    details: { fields: ['phone', 'address'] },
+    ipAddress,
+  });
+
+  return getCurrentUser(userId);
+}
