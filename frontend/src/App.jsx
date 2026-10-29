@@ -30,6 +30,10 @@ import ImprovementPage from './pages/ImprovementPage.jsx';
 import OfficesPage from './pages/OfficesPage.jsx';
 import ReferralsPage from './pages/ReferralsPage.jsx';
 import ArchivePage from './pages/ArchivePage.jsx';
+import AuditTrailPage from './pages/AuditTrailPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
+import FormsPage from './pages/FormsPage.jsx';
+import CoursesPage from './pages/CoursesPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
 import {
@@ -44,30 +48,19 @@ import {
  */
 const placeholderPages = [
   {
-    path: 'academic',
-    title: 'Courses & instructors',
-    description:
-      'Manage course and instructor records and approved assignments.',
+    path: 'dashboard',
+    title: 'Dashboard',
+    description: 'System overview.',
   },
   {
-    path: 'forms',
-    title: 'Official evaluation forms',
-    description:
-      'Configure evaluation criteria and sections from official university forms.',
-  },
-  {
-    path: 'audit',
-    title: 'Audit trail',
-    description:
-      'Review authorized records of sensitive actions and workflow decisions.',
-  },
-  {
-    path: 'settings',
-    title: 'Settings',
-    description:
-      'Configure approved system options and profile preferences.',
+    path: 'reports',
+    title: 'Reports',
+    description: 'View reports.',
   },
 ];
+  
+  
+
 
 /**
  * All implemented pages.
@@ -92,6 +85,10 @@ const implementedPages = {
   offices: OfficesPage,
   referrals: ReferralsPage,
   archive: ArchivePage,
+  audit: AuditTrailPage,
+  settings: SettingsPage,
+     forms: FormsPage,
+       academic: CoursesPage,
 };
 
 function LoadingScreen() {
