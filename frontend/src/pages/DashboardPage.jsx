@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import {
   Activity,
@@ -100,7 +99,11 @@ function LoadingPanel() {
   );
 }
 
- function GeneralDashboard() {
+/* ------------------------------------------------------------------ */
+/* General dashboard (admin, committee, student, teacher, archives…)   */
+/* ------------------------------------------------------------------ */
+
+function GeneralDashboard({ user }) {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -141,6 +144,10 @@ function LoadingPanel() {
   const users = dashboard?.users;
   const cycles = dashboard?.cycles ?? [];
   const recent = dashboard?.recent ?? [];
+
+  // Teachers and students take part in evaluations; they do not manage cycles or tasks.
+  const isParticipant = user?.role === 'teacher' || user?.role === 'student';
+  const openCycles = cycles.filter((cycle) => cycle.status === 'active');
 
   const totalAssignments = Number(counts.total ?? 0);
   const submittedAssignments = Number(counts.submitted ?? 0);
@@ -312,22 +319,30 @@ function LoadingPanel() {
 
             <div className="asems-surface rounded-xl border p-5 shadow-sm sm:p-6">
               <SectionHeading
-                title="Evaluation cycles"
-                description="Most recent cycles returned by the API"
+                title={isParticipant ? 'Current evaluation cycle' : 'Evaluation cycles'}
+                description={
+                  isParticipant
+                    ? 'The cycle that is open for evaluation now'
+                    : 'Most recent cycles returned by the API'
+                }
                 action={
-                  <DashboardLink to="/cycles">
-                    View all <ArrowRight size={15} />
-                  </DashboardLink>
+                  isParticipant ? null : (
+                    <DashboardLink to="/cycles">
+                      View all <ArrowRight size={15} />
+                    </DashboardLink>
+                  )
                 }
               />
 
-              {cycles.length === 0 ? (
+              {(isParticipant ? openCycles : cycles).length === 0 ? (
                 <p className="asems-muted py-4 text-sm">
-                  No evaluation cycles were found.
+                  {isParticipant
+                    ? 'No evaluation cycle is open right now.'
+                    : 'No evaluation cycles were found.'}
                 </p>
               ) : (
                 <div className="divide-y divide-[var(--asems-border)]">
-                  {cycles.slice(0, 5).map((cycle) => (
+                  {(isParticipant ? openCycles : cycles).slice(0, 5).map((cycle) => (
                     <div
                       key={cycle.id}
                       className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
@@ -367,9 +382,15 @@ function LoadingPanel() {
                 title="Recent evaluation activity"
                 description="Latest assignment records returned by the backend"
                 action={
-                  <DashboardLink to="/tasks">
-                    View tasks <ArrowRight size={15} />
-                  </DashboardLink>
+                  isParticipant ? (
+                    <DashboardLink to="/my-evaluations">
+                      Open my evaluations <ArrowRight size={15} />
+                    </DashboardLink>
+                  ) : (
+                    <DashboardLink to="/tasks">
+                      View tasks <ArrowRight size={15} />
+                    </DashboardLink>
+                  )
                 }
               />
             </div>
@@ -606,12 +627,9 @@ function ConcernedOfficeDashboard() {
     </div>
   );
 }
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
-/* Dean, Academic VP and Department Head dashboards                    */
+/* Dean, Academic VP, Department Head and College administration       */
 /* ------------------------------------------------------------------ */
 
 const EMPTY_DATA = { evaluations: [], summaries: [], referrals: [] };
@@ -638,6 +656,11 @@ const ROLE_COPY = {
     eyebrow: 'Department',
     title: 'Department head overview',
     text: 'Final summaries of your department and the improvement referrals you sent to the concerned offices.',
+  },
+  management: {
+    eyebrow: 'College / school administration',
+    title: 'College administration overview',
+    text: 'Final summaries received from the departments, and the reports that still have to be forwarded to the Academic Affairs VP office.',
   },
 };
 
@@ -757,23 +780,31 @@ function RoleDashboard({ role }) {
   const reviewed = byStatus('reviewed');
   const archived = byStatus('archived');
 
+  // Reviewed reports that were not forwarded to the Academic Affairs VP office yet.
+  const waitingToForward = countBy(
+    summaries,
+    (item) =>
+      String(item.status || '').toLowerCase() === 'reviewed' &&
+      !item.forwarded_to_vp,
+  );
+
   const waitingReferrals = countBy(referrals, (item) => !item.acknowledgedAt);
 
   let cards = [];
-  let steps = [];
+  const steps = [];
 
   if (role === 'dean') {
     cards = [
       { label: 'Leadership evaluations', value: evaluations.length, note: `${submittedEvaluations} submitted`, icon: ClipboardCheck, tone: 'navy' },
       { label: 'Drafts to finish', value: draftEvaluations, note: 'Saved but not submitted', icon: Clock3, tone: 'gold' },
-      { label: 'Reviewed reports', value: reviewed, note: `${archived} archived`, icon: CheckCircle2, tone: 'teal' },
+      { label: 'Waiting to forward', value: waitingToForward, note: 'Reviewed, not yet sent to the VP office', icon: CheckCircle2, tone: 'teal' },
       { label: 'Referrals', value: referrals.length, note: `${waitingReferrals} waiting for the office`, icon: Activity, tone: 'slate' },
     ];
     if (draftEvaluations > 0) {
       steps.push({ text: `Finish ${draftEvaluations} leadership evaluation(s)`, to: '/leadership' });
     }
-    if (reviewed > 0) {
-      steps.push({ text: `${reviewed} reviewed report(s): forward them to the Academic Affairs VP office`, to: '/reports' });
+    if (waitingToForward > 0) {
+      steps.push({ text: `${waitingToForward} reviewed report(s) are waiting to be forwarded to the Academic Affairs VP office`, to: '/reports' });
     }
   } else if (role === 'academic_vp') {
     cards = [
@@ -787,6 +818,16 @@ function RoleDashboard({ role }) {
     }
     if (reviewed > 0) {
       steps.push({ text: `${reviewed} report(s) need the teacher, department and college copies`, to: '/reports' });
+    }
+  } else if (role === 'management') {
+    cards = [
+      { label: 'Summaries received', value: summaries.length, note: `${incomplete} still incomplete`, icon: ClipboardCheck, tone: 'navy' },
+      { label: 'Waiting to forward', value: waitingToForward, note: 'Reviewed, not yet sent to the VP office', icon: Clock3, tone: 'gold' },
+      { label: 'Ready to finalize', value: readyToFinalize, note: 'Waiting for the final Form E comments', icon: Activity, tone: 'slate' },
+      { label: 'Archived', value: archived, note: 'Archived at all three levels', icon: CheckCircle2, tone: 'teal' },
+    ];
+    if (waitingToForward > 0) {
+      steps.push({ text: `${waitingToForward} reviewed report(s) are waiting to be forwarded to the Academic Affairs VP office`, to: '/reports' });
     }
   } else {
     cards = [
@@ -886,7 +927,11 @@ function RoleDashboard({ role }) {
         </div>
       )}
 
-      {loading && evaluations.length === 0 && summaries.length === 0 && referrals.length === 0 && !error ? (
+      {loading &&
+      evaluations.length === 0 &&
+      summaries.length === 0 &&
+      referrals.length === 0 &&
+      !error ? (
         <LoadingPanel />
       ) : (
         <>
@@ -949,7 +994,7 @@ function RoleDashboard({ role }) {
           ) : (
             <SimpleTable
               title="Recent summaries"
-              description="Latest final evaluation summaries of your department"
+              description="Latest final evaluation summaries in your scope"
               action={
                 <DashboardLink to="/reports">
                   View all <ArrowRight size={15} />
@@ -979,9 +1024,9 @@ export default function DashboardPage({ user }) {
     return <ConcernedOfficeDashboard />;
   }
 
-  if (['dean', 'academic_vp', 'department_head'].includes(user?.role)) {
+  if (['dean', 'academic_vp', 'department_head', 'management'].includes(user?.role)) {
     return <RoleDashboard key={user.role} role={user.role} />;
   }
 
-  return <GeneralDashboard />;
+  return <GeneralDashboard user={user} />;
 }
