@@ -21,7 +21,6 @@ const COMPONENTS = [
 ];
 
 const ALLOWED_ROLES = [
-  'admin',
   'committee',
   'department_head',
   'dean',

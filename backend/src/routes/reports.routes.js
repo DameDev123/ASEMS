@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { pool } from '../config/database.js';
 import { requireAuth, allowRoles } from '../middlewares/auth.js';
@@ -9,7 +8,10 @@ import { getFormESummary } from '../services/formEReportService.js';
 const router = Router();
 router.use(requireAuth);
 
-const REPORT_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management', 'academic_vp'];
+// The system administrator is not part of the evaluation reporting chain (department head ->
+// college -> Academic Affairs Vice President -> archives), so it does not read instructor summaries
+// or Form E. Administrators still reopen rejected forms through the workflow routes.
+const REPORT_ROLES = ['committee', 'department_head', 'dean', 'management', 'academic_vp'];
 
 const SUMMARY_STATUSES = ['incomplete', 'complete', 'reviewed', 'archived'];
 

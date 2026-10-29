@@ -1,6 +1,5 @@
-
 import { useCallback, useEffect, useState } from 'react';
-import { Award, Clock, FileDown, Printer, RefreshCw } from 'lucide-react';
+import { Award, Clock, FileDown, RefreshCw } from 'lucide-react';
 import { apiRequest } from '../services/api.js';
 
 const VIEW_ROLES = ['teacher'];
@@ -27,6 +26,15 @@ function formatDate(value = new Date()) {
     month: 'long',
     year: 'numeric',
   });
+}
+
+// Every component that has tasks is fully approved, so only the final Form E step is missing.
+function allComponentsApproved(cycle) {
+  const withTasks = TYPES.filter((type) => cycle.progress?.[type]?.total > 0);
+  return (
+    withTasks.length > 0 &&
+    withTasks.every((type) => cycle.progress[type].approved === cycle.progress[type].total)
+  );
 }
 
 function Bar({ percent, tone = 'bg-navy-800' }) {
@@ -164,14 +172,16 @@ function ReleasedCycle({ cycle }) {
 }
 
 function PendingCycle({ cycle }) {
+  const allApproved = allComponentsApproved(cycle);
+
   return (
     <div className="space-y-4 p-5">
       <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <Clock size={18} className="mt-0.5 shrink-0" />
         <p>
-          Your results are not released yet. They appear after every
-          component is submitted and approved by Committee → Department Head
-          → Dean → Management.
+          {allApproved
+            ? 'All evaluations are approved. Your results are released after the Committee or Department Head records the final Form E comments.'
+            : 'Your results are not released yet. They appear after every component is submitted and approved, and the Committee or Department Head records the final Form E comments.'}
         </p>
       </div>
 
@@ -338,8 +348,8 @@ export default function MyResultsPage({ user }) {
             My results
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Your evaluation score for each cycle, released once the approval
-            workflow is complete.
+            Your evaluation score for each cycle, released once every
+            evaluation is approved and the final Form E review is recorded.
           </p>
         </div>
 
@@ -429,6 +439,8 @@ export default function MyResultsPage({ user }) {
                     <span className="inline-flex items-center gap-1">
                       <Award size={12} /> Released
                     </span>
+                  ) : allComponentsApproved(cycle) ? (
+                    'Awaiting final review'
                   ) : (
                     'In progress'
                   )}

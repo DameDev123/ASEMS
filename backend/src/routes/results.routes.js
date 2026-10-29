@@ -90,7 +90,9 @@ router.get('/me', asyncHandler(async (req, res) => {
 
   const results = [...cycles.values()].map((cycle) => {
     const summary = summaries.get(cycle.cycleId);
-    const released = summary?.status === 'reviewed';
+
+    // Results stay visible after the report has been archived.
+    const released = ['reviewed', 'archived'].includes(summary?.status);    
     const base = { ...cycle, released, scores: null, comments: null };
     if (!released) return base;
 
