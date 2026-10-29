@@ -23,8 +23,17 @@ const commentsSchema = z.object({
   commentStrengths: z.string().max(10000).optional().nullable(),
   commentImprovements: z.string().max(10000).optional().nullable(),
 });
-
 async function getOwnedAssignment(connection, assignmentId, userId, role) {
+  // Administrators manage the evaluation process but never fill in an evaluation
+  // on behalf of a student, peer, department head or instructor.
+  if (role === 'admin') {
+    throw httpError(
+      403,
+      'Administrators manage evaluations but cannot fill them in on behalf of an evaluator.',
+      'ADMIN_CANNOT_EVALUATE',
+    );
+  }
+
   const [rows] = await connection.execute(
     `SELECT a.id, a.cycle_id, a.form_id, a.instructor_id, a.evaluator_id, a.status AS assignment_status,
             cy.status AS cycle_status, f.weight, f.evaluator_type,
@@ -33,12 +42,14 @@ async function getOwnedAssignment(connection, assignmentId, userId, role) {
        JOIN evaluation_cycles cy ON cy.id = a.cycle_id
        JOIN evaluation_forms f ON f.id = a.form_id
        JOIN form_versions fv ON fv.id = a.form_version_id
-      WHERE a.id = ? ${role === 'admin' ? '' : 'AND a.evaluator_id = ?'}
+      WHERE a.id = ? AND a.evaluator_id = ?
       LIMIT 1`,
-    role === 'admin' ? [assignmentId] : [assignmentId, userId]
+    [assignmentId, userId],
   );
   return rows[0];
 }
+
+
 
 router.put('/:assignmentId/draft', asyncHandler(async (req, res) => {
   const assignmentId = Number(req.params.assignmentId);
