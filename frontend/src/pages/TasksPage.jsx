@@ -4,15 +4,12 @@ import { apiRequest } from '../services/api.js';
 
 const PAGE_SIZE = 25;
 const BATCHES = ['I', 'II', 'III', 'IV', 'V'];
-const SEMESTERS = ['I', 'II'];
 
 const EMPTY_FORM = {
   cycleId: '',
   instructorId: '',
-  courseTitle: '',
-  courseCode: '',
+  assignmentId: '',
   batch: '',
-  semester: '',
   studentIds: [],
   departmentHeadId: '',
   peerIds: [],
@@ -30,6 +27,18 @@ const INPUT_CLASS =
   'h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-navy-800';
 const ROW_BUTTON =
   'inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60';
+
+function sameYear(a, b) {
+  const clean = (value) => String(value ?? '').trim().toLowerCase();
+  return clean(a) === clean(b);
+}
+
+// Course assignments usable for a cycle: those of the cycle's academic year (all, if either side has no year).
+function coursesForCycle(assignments, cycle) {
+  const year = String(cycle?.academicYear ?? '').trim();
+  if (!year) return assignments;
+  return assignments.filter((course) => !String(course.academicYear ?? '').trim() || sameYear(course.academicYear, year));
+}
 
 function toggle(list, value) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -59,8 +68,8 @@ function CheckList({ title, items, selected, onToggle, emptyText }) {
 }
 
 export default function TasksPage({ user }) {
-  const canManage = user?.role === 'admin' || user?.role === 'committee';
-  const isCommittee = user?.role === 'committee';
+  const canManage = ['committee', 'department_head'].includes(user?.role);
+  const isDepartmentScoped = user?.role === 'committee' || user?.role === 'department_head';
 
   const [cycles, setCycles] = useState([]);
   const [cycleFilter, setCycleFilter] = useState('');
@@ -116,13 +125,23 @@ export default function TasksPage({ user }) {
 
   const openCycles = useMemo(() => cycles.filter((cycle) => cycle.status !== 'closed'), [cycles]);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const selectedInstructor = candidates.instructors.find((person) => String(person.id) === form.instructorId);
+  const selectedCycle = cycles.find((cycle) => String(cycle.id) === form.cycleId);
+  const allCourses = selectedInstructor?.assignments ?? [];
+  const instructorCourses = coursesForCycle(allCourses, selectedCycle);
+  const noCourses = Boolean(selectedInstructor) && instructorCourses.length === 0;
+  const wrongYearOnly = noCourses && allCourses.length > 0;
+  // Only the head of the instructor's own department can evaluate them (when the department is known).
+  const headsForInstructor = selectedInstructor?.departmentId
+    ? candidates.departmentHeads.filter((head) => head.departmentId === selectedInstructor.departmentId)
+    : candidates.departmentHeads;
 
   if (!canManage) {
     return (
       <section className="rounded-2xl border border-rose-100 bg-white p-8">
         <h1 className="text-xl font-semibold text-slate-900">Access restricted</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Evaluation tasks are managed by administrators and committee members. Your own assigned forms are under
+          Evaluation tasks are managed by committee members and department heads. Your own assigned forms are under
           “My evaluations”.
         </p>
       </section>
@@ -151,12 +170,47 @@ export default function TasksPage({ user }) {
     setForm((current) => ({ ...current, [name]: value }));
   }
 
+  // Changing the cycle changes which course assignments (by academic year) are valid.
+  function handleCycleChange(event) {
+    const cycleId = event.target.value;
+    const cycle = cycles.find((item) => String(item.id) === cycleId);
+    const person = candidates.instructors.find((item) => String(item.id) === form.instructorId);
+    const usable = coursesForCycle(person?.assignments ?? [], cycle);
+    setForm((current) => ({
+      ...current,
+      cycleId,
+      assignmentId: usable.length === 1 ? String(usable[0].id) : usable.some((c) => String(c.id) === current.assignmentId) ? current.assignmentId : '',
+    }));
+  }
+
+  // Choosing an instructor fills the course list from that instructor's course assignments.
+  function handleInstructorChange(event) {
+    const instructorId = event.target.value;
+    const person = candidates.instructors.find((item) => String(item.id) === instructorId);
+    const cycle = cycles.find((item) => String(item.id) === form.cycleId);
+    const assignments = coursesForCycle(person?.assignments ?? [], cycle);
+    const heads = person?.departmentId
+      ? candidates.departmentHeads.filter((head) => head.departmentId === person.departmentId)
+      : candidates.departmentHeads;
+    setForm((current) => ({
+      ...current,
+      instructorId,
+      assignmentId: assignments.length === 1 ? String(assignments[0].id) : '',
+      departmentHeadId: heads.length === 1 ? String(heads[0].id) : '',
+      peerIds: current.peerIds.filter((peerId) => String(peerId) !== instructorId),
+    }));
+  }
+
   async function submitForm(event) {
     event.preventDefault();
     setDialogError('');
 
     if (!form.cycleId || !form.instructorId) {
       setDialogError('Choose a cycle and an instructor.');
+      return;
+    }
+    if (!form.assignmentId) {
+      setDialogError('Choose one of the instructor’s assigned courses.');
       return;
     }
     if (!form.studentIds.length && !form.departmentHeadId && !form.peerIds.length && !form.includeSelf) {
@@ -171,10 +225,8 @@ export default function TasksPage({ user }) {
         body: JSON.stringify({
           cycleId: Number(form.cycleId),
           instructorId: Number(form.instructorId),
-          courseTitle: form.courseTitle.trim(),
-          courseCode: form.courseCode.trim(),
+          assignmentId: Number(form.assignmentId),
           batch: form.batch || null,
-          semester: form.semester || null,
           studentIds: form.studentIds,
           departmentHeadId: form.departmentHeadId ? Number(form.departmentHeadId) : null,
           peerIds: form.peerIds,
@@ -217,7 +269,7 @@ export default function TasksPage({ user }) {
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Evaluation tasks</h1>
           <p className="mt-1 text-sm text-slate-500">
             Assign eligible evaluators and track required component submissions.
-            {isCommittee && ' You can manage tasks for your own department only.'}
+            {isDepartmentScoped && ' You can manage tasks for your own department only.'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -347,14 +399,14 @@ export default function TasksPage({ user }) {
           <form onSubmit={submitForm} className="panel-card my-auto w-full max-w-2xl space-y-4 p-6">
             <h2 id="task-dialog-title" className="text-lg font-semibold text-slate-900">Assign evaluators</h2>
             <p className="text-sm text-slate-500">
-              Creates one task per evaluator for a single instructor and course. Tasks that already
+              Creates one task per evaluator for a single instructor and one of their assigned courses. Tasks that already
               exist are skipped.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="task-cycle" className="mb-1 block text-sm font-medium text-slate-700">Cycle</label>
-                <select id="task-cycle" name="cycleId" required value={form.cycleId} onChange={handleChange} className={INPUT_CLASS}>
+                <select id="task-cycle" name="cycleId" required value={form.cycleId} onChange={handleCycleChange} className={INPUT_CLASS}>
                   <option value="">Select a cycle…</option>
                   {openCycles.map((cycle) => (
                     <option key={cycle.id} value={cycle.id}>{cycle.title} ({cycle.academicYear})</option>
@@ -363,33 +415,46 @@ export default function TasksPage({ user }) {
               </div>
               <div>
                 <label htmlFor="task-instructor" className="mb-1 block text-sm font-medium text-slate-700">Instructor</label>
-                <select id="task-instructor" name="instructorId" required value={form.instructorId} onChange={handleChange} className={INPUT_CLASS}>
+                <select id="task-instructor" name="instructorId" required value={form.instructorId} onChange={handleInstructorChange} className={INPUT_CLASS}>
                   <option value="">Select an instructor…</option>
                   {candidates.instructors.map((person) => (
                     <option key={person.id} value={person.id}>{person.name}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label htmlFor="task-title" className="mb-1 block text-sm font-medium text-slate-700">Course title</label>
-                <input id="task-title" name="courseTitle" required maxLength={255} value={form.courseTitle} onChange={handleChange} className={INPUT_CLASS} />
-              </div>
-              <div>
-                <label htmlFor="task-code" className="mb-1 block text-sm font-medium text-slate-700">Course code</label>
-                <input id="task-code" name="courseCode" maxLength={50} value={form.courseCode} onChange={handleChange} className={INPUT_CLASS} />
+              <div className="sm:col-span-2">
+                <label htmlFor="task-course" className="mb-1 block text-sm font-medium text-slate-700">Course</label>
+                <select
+                  id="task-course"
+                  name="assignmentId"
+                  required
+                  value={form.assignmentId}
+                  onChange={handleChange}
+                  disabled={!selectedInstructor || noCourses}
+                  className={`${INPUT_CLASS} disabled:bg-slate-50 disabled:text-slate-400`}
+                >
+                  <option value="">{selectedInstructor ? 'Select a course…' : 'Choose an instructor first'}</option>
+                  {instructorCourses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      {[course.courseCode, course.courseTitle].filter(Boolean).join(' — ')}
+                      {course.semester ? ` · Sem ${course.semester}` : ''}
+                      {course.academicYear ? ` · ${course.academicYear}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {noCourses && (
+                  <p role="alert" className="mt-1 text-xs text-rose-600">
+                    {wrongYearOnly
+                      ? `This instructor has no course assigned for ${selectedCycle?.academicYear}. Assign a course under Courses & instructors first.`
+                      : 'This instructor has no assigned course. Assign one under Courses & instructors first.'}
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="task-batch" className="mb-1 block text-sm font-medium text-slate-700">Batch</label>
                 <select id="task-batch" name="batch" value={form.batch} onChange={handleChange} className={INPUT_CLASS}>
                   <option value="">—</option>
                   {BATCHES.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="task-semester" className="mb-1 block text-sm font-medium text-slate-700">Semester</label>
-                <select id="task-semester" name="semester" value={form.semester} onChange={handleChange} className={INPUT_CLASS}>
-                  <option value="">—</option>
-                  {SEMESTERS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               </div>
             </div>
@@ -406,7 +471,7 @@ export default function TasksPage({ user }) {
               <label htmlFor="task-head" className="mb-1 block text-sm font-medium text-slate-700">Department head</label>
               <select id="task-head" name="departmentHeadId" value={form.departmentHeadId} onChange={handleChange} className={INPUT_CLASS}>
                 <option value="">None</option>
-                {candidates.departmentHeads.map((person) => (
+                {headsForInstructor.map((person) => (
                   <option key={person.id} value={person.id}>{person.name}</option>
                 ))}
               </select>
@@ -442,7 +507,7 @@ export default function TasksPage({ user }) {
               >
                 Cancel
               </button>
-              <button type="submit" disabled={saving} className="primary-button disabled:opacity-60">
+              <button type="submit" disabled={saving || noCourses} className="primary-button disabled:opacity-60">
                 {saving ? 'Creating…' : 'Create tasks'}
               </button>
             </div>

@@ -311,7 +311,7 @@ export default function ReportsWorkflowPage({ user }) {
           <p className="text-xs text-slate-500">Receives the final summary and forwards it to the Academic Affairs VP office or Campus Academic Vice Director.</p>
           {routing.forwardedToVp
             ? <p className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700"><CheckCircle2 size={14} /> Forwarded on {date(routing.forwardedToVp.at)} by {routing.forwardedToVp.byName || 'the college administration'}</p>
-            : <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-amber-700">Waiting for the Dean to forward this summary.</span>{actions.canForwardToVp && <button type="button" disabled={saving} className={primaryButton} onClick={forwardToVp}><Send size={14} /> Forward to the Academic Affairs VP office</button>}</div>}
+            : <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-amber-700">Waiting for the college administration to forward this summary.</span>{actions.canForwardToVp && <button type="button" disabled={saving} className={primaryButton} onClick={forwardToVp}><Send size={14} /> Forward to the Academic Affairs VP office</button>}</div>}
         </section>
 
         <section className="space-y-2 rounded-lg border border-slate-200 p-3">

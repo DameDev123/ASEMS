@@ -11,6 +11,15 @@ import { recomputeInstructorSummary } from '../services/summaryService.js';
 const router = Router();
 router.use(requireAuth);
 
+// Evaluation forms are filled in and submitted only by the evaluator they were assigned to.
+// Administrators manage tasks and workflow, but must not evaluate (separation of duties).
+router.use((req, res, next) => {
+  if (req.user?.role === 'admin') {
+    return next(httpError(403, 'Administrators cannot fill in or submit evaluation forms.', 'ADMIN_CANNOT_EVALUATE'));
+  }
+  return next();
+});
+
 const evaluationSchema = z.object({
   scores: z.array(z.object({
     criterionId: z.number().int().positive(),
@@ -23,17 +32,8 @@ const commentsSchema = z.object({
   commentStrengths: z.string().max(10000).optional().nullable(),
   commentImprovements: z.string().max(10000).optional().nullable(),
 });
-async function getOwnedAssignment(connection, assignmentId, userId, role) {
-  // Administrators manage the evaluation process but never fill in an evaluation
-  // on behalf of a student, peer, department head or instructor.
-  if (role === 'admin') {
-    throw httpError(
-      403,
-      'Administrators manage evaluations but cannot fill them in on behalf of an evaluator.',
-      'ADMIN_CANNOT_EVALUATE',
-    );
-  }
 
+async function getOwnedAssignment(connection, assignmentId, userId) {
   const [rows] = await connection.execute(
     `SELECT a.id, a.cycle_id, a.form_id, a.instructor_id, a.evaluator_id, a.status AS assignment_status,
             cy.status AS cycle_status, f.weight, f.evaluator_type,
@@ -44,12 +44,10 @@ async function getOwnedAssignment(connection, assignmentId, userId, role) {
        JOIN form_versions fv ON fv.id = a.form_version_id
       WHERE a.id = ? AND a.evaluator_id = ?
       LIMIT 1`,
-    [assignmentId, userId],
+    [assignmentId, userId]
   );
   return rows[0];
 }
-
-
 
 router.put('/:assignmentId/draft', asyncHandler(async (req, res) => {
   const assignmentId = Number(req.params.assignmentId);
@@ -60,7 +58,7 @@ router.put('/:assignmentId/draft', asyncHandler(async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.id), req.user.role);
+    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.id));
     if (!assignment) throw httpError(404, 'Assignment not found.', 'NOT_FOUND');
     if (assignment.cycle_status !== 'active') throw httpError(409, 'This evaluation cycle is not active.', 'CYCLE_NOT_ACTIVE');
 
@@ -129,7 +127,7 @@ router.post('/:assignmentId/submit', asyncHandler(async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.id), req.user.role);
+    const assignment = await getOwnedAssignment(connection, assignmentId, Number(req.user.id));
     if (!assignment) throw httpError(404, 'Assignment not found.', 'NOT_FOUND');
     if (assignment.cycle_status !== 'active') throw httpError(409, 'This evaluation cycle is not active.', 'CYCLE_NOT_ACTIVE');
 
