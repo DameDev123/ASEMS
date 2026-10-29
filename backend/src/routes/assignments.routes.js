@@ -21,6 +21,8 @@ const assignmentSelect = `
     JOIN users evaluator ON evaluator.id = a.evaluator_id
     LEFT JOIN evaluations e ON e.assignment_id = a.id`;
 
+// Administrators run the evaluation process but are not evaluators: they never read the answers or
+// comments of an evaluation. They may list assignments (who evaluates whom, and the status) without comments.
 router.get('/', asyncHandler(async (req, res) => {
   const values = [];
   let where = '';
@@ -29,16 +31,24 @@ router.get('/', asyncHandler(async (req, res) => {
     values.push(Number(req.user.id));
   }
   const [rows] = await pool.execute(`${assignmentSelect}${where} ORDER BY a.created_at DESC`, values);
-  sendData(res, rows);
+  sendData(
+    res,
+    req.user.role === 'admin'
+      ? rows.map(({ comment_strengths: _s, comment_improvements: _i, ...rest }) => rest)
+      : rows,
+  );
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, 'Invalid assignment ID.', 'VALIDATION_ERROR');
-  const values = [id];
-  let access = '';
-  if (req.user.role !== 'admin') { access = ' AND a.evaluator_id = ?'; values.push(Number(req.user.id)); }
-  const [rows] = await pool.execute(`${assignmentSelect} WHERE a.id = ?${access} LIMIT 1`, values);
+  if (req.user.role === 'admin') {
+    throw httpError(403, 'Administrators cannot open the answers of an evaluation.', 'ADMIN_CANNOT_VIEW_EVALUATION');
+  }
+  const [rows] = await pool.execute(
+    `${assignmentSelect} WHERE a.id = ? AND a.evaluator_id = ? LIMIT 1`,
+    [id, Number(req.user.id)],
+  );
   const assignment = rows[0];
   if (!assignment) throw httpError(404, 'Assignment not found.', 'NOT_FOUND');
 
