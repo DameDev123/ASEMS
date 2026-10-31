@@ -4,19 +4,33 @@ import { pool } from '../config/database.js';
 import { requireAuth, allowRoles } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 import { writeAudit } from '../utils/audit.js';
-import { recomputeInstructorSummary } from '../services/summaryService.js';
+import { recomputeInstructorSummary, calculateFormE } from '../services/summaryService.js';
+import { deriveReportStage } from '../utils/reportStage.js';
 
 // Workflow rules:
 // 1. Committee members and department heads review submitted forms.
 // 2. Administrators may reopen rejected evaluations with a documented reason.
-// 3. Form E can be finalized only after all required evaluations are approved.
-// 4. The college forwards finalized reports to the Academic Affairs VP office.
-// 5. The VP office records three copies. The archive office records the archive levels.
+// 3. The report then moves through the confirmed approval order, one stage at a time:
+//      Committee -> Department Head -> College -> VP's Office
+//    a. Committee: endorses Form E once all required evaluations are approved (POST .../endorse).
+//    b. Department head: finalizes Form E, but only after the committee endorsed it.
+//    c. College / School / Institute administration (role `management`): forwards the finalized
+//       report to the Academic Affairs VP office. The dean is not a stage actor: the dean's own
+//       duty is evaluating the department head (leadership module).
+//    d. VP office: records the three copies, which forwards the report to the archive office.
+//    Every step checks the previous one on the server, so no stage can be skipped.
+//    The system administrator is not part of this chain: it can read it (CHAIN_ROLES) but cannot
+//    act in any stage. Only the role that owns a stage can perform it.
+// 4. The archive office records the archive levels.
 
 const router = Router();
 router.use(requireAuth);
 
 const REVIEW_ROLES = ['committee', 'department_head'];
+
+// Report approval stages (Form E). Each stage has exactly one acting role.
+const ENDORSE_ROLES = ['committee'];
+const FINALIZE_ROLES = ['department_head'];
 const ALLOWED_OFFICE_ROLES = ['management', 'dean', 'admin'];
 
 const REPORT_OFFICE_ROLE =
@@ -37,9 +51,12 @@ const CHAIN_ROLES = [
   'management',
   'academic_vp',
 ];
-const FORWARD_TO_VP_ROLES = ['management', 'dean', 'admin'];
+// Stage 3 (College) and stage 4 (VP's Office). No `admin` here: administrators may view the chain
+// but must not forward a report or record the VP office's copies on its behalf. No `dean` either:
+// forwarding belongs to the college administration; a dean may only read the chain (CHAIN_ROLES).
+const FORWARD_TO_VP_ROLES = ['management'];
 
-const VP_OFFICE_ROLES = ['academic_vp', 'admin'];
+const VP_OFFICE_ROLES = ['academic_vp'];
 
 const ARCHIVE_LEVEL_KEYS = {
   department: 'department',
@@ -59,6 +76,10 @@ const reopenSchema = z.object({
 const finalizeSchema = z.object({
   strengths: z.string().trim().min(1).max(10000),
   improvements: z.string().trim().min(1).max(10000),
+});
+
+const endorseSchema = z.object({
+  note: z.string().trim().max(10000).optional().nullable(),
 });
 
 const noteSchema = z.object({
@@ -93,10 +114,8 @@ function parseBody(schema, body, message) {
   return parsed.data;
 }
 
-// Department heads can only access instructors in their own department.
-async function assertInScope(connection, user, instructorId) {
-  if (user.role !== 'department_head') return;
-
+// The viewer must share a department with the instructor.
+async function assertDepartmentScope(connection, user, instructorId) {
   const [rows] = await connection.execute(
     `SELECT 1 AS ok
        FROM employees viewer
@@ -112,6 +131,13 @@ async function assertInScope(connection, user, instructorId) {
   if (!rows.length) {
     throw httpError(404, 'Record not found.', 'NOT_FOUND');
   }
+}
+
+// Department heads can only access instructors in their own department.
+async function assertInScope(connection, user, instructorId) {
+  if (user.role !== 'department_head') return;
+
+  await assertDepartmentScope(connection, user, instructorId);
 }
 
 // Department heads are limited to their department.
@@ -166,7 +192,8 @@ async function inTransaction(work) {
 
 async function lockSummary(connection, summaryId) {
   const [rows] = await connection.execute(
-    `SELECT id, cycle_id, instructor_id, status
+    `SELECT id, cycle_id, instructor_id, status,
+            committee_endorsed_by, committee_endorsed_at
        FROM evaluation_summaries
       WHERE id = ?
       FOR UPDATE`,
@@ -182,6 +209,29 @@ async function lockSummary(connection, summaryId) {
   }
 
   return rows[0];
+}
+
+// Why a Form E cannot move to the committee or department head stage yet.
+function notReadyReasons(form) {
+  const reasons = [];
+
+  if (form.missingGroups.length) {
+    reasons.push(
+      `no counted evaluation from: ${form.missingGroups.join(', ')}`,
+    );
+  }
+
+  for (const item of form.pendingGroups) {
+    reasons.push(
+      `${item.assigned - item.submitted} ${item.type} evaluator(s) have not submitted`,
+    );
+  }
+
+  if (!reasons.length) {
+    reasons.push('some submitted forms are not approved yet');
+  }
+
+  return reasons;
 }
 
 /* ================================================================
@@ -502,12 +552,123 @@ router.post(
 );
 
 /* ================================================================
-   FINALIZE FORM E
+   COMMITTEE ENDORSEMENT (stage 1 of the report approval order)
+   ================================================================ */
+
+// The committee endorses Form E once every required evaluation is approved. Until then the
+// department head cannot finalize it. The endorsement is cleared again if the evaluations change
+// (see recomputeInstructorSummary), so the committee only ever endorses what it saw.
+router.post(
+  '/summaries/:summaryId/endorse',
+  allowRoles(...ENDORSE_ROLES),
+  asyncHandler(async (req, res) => {
+    const summaryId = parseId(
+      req.params.summaryId,
+      'summary ID',
+    );
+
+    const { note } = parseBody(
+      endorseSchema,
+      req.body,
+      'Invalid endorsement.',
+    );
+
+    const result = await inTransaction(async (connection) => {
+      const summary = await lockSummary(
+        connection,
+        summaryId,
+      );
+
+      await assertDepartmentScope(
+        connection,
+        req.user,
+        summary.instructor_id,
+      );
+
+      if (
+        Number(req.user.id) === Number(summary.instructor_id)
+      ) {
+        throw httpError(
+          403,
+          'You cannot endorse your own evaluation.',
+          'SELF_REVIEW',
+        );
+      }
+
+      if (['reviewed', 'archived'].includes(summary.status)) {
+        throw httpError(
+          409,
+          'This Form E has already been finalized, so the committee stage is over.',
+          'ALREADY_FINALIZED',
+        );
+      }
+
+      if (summary.committee_endorsed_at) {
+        throw httpError(
+          409,
+          'This Form E has already been endorsed by the committee.',
+          'ALREADY_ENDORSED',
+        );
+      }
+
+      const form = await calculateFormE(
+        connection,
+        summary.cycle_id,
+        summary.instructor_id,
+      );
+
+      if (form.state !== 'approved') {
+        throw httpError(
+          409,
+          `Form E cannot be endorsed yet: ${notReadyReasons(form).join('; ')}.`,
+          'NOT_READY_TO_ENDORSE',
+        );
+      }
+
+      await connection.execute(
+        `UPDATE evaluation_summaries
+            SET committee_endorsed_by = ?,
+                committee_endorsed_at = NOW(),
+                committee_endorsement_note = ?
+          WHERE id = ?`,
+        [
+          Number(req.user.id),
+          note || null,
+          summaryId,
+        ],
+      );
+
+      await writeAudit(connection, {
+        userId: Number(req.user.id),
+        action: 'summary_endorsed_by_committee',
+        entityType: 'evaluation_summary',
+        entityId: summaryId,
+        details: {
+          role: req.user.role,
+          totalScore: form.total,
+          note: note || null,
+        },
+        ipAddress: req.ip,
+      });
+
+      return {
+        summaryId,
+        stage: 'department_head',
+        endorsed: true,
+      };
+    });
+
+    sendData(res, result, 201);
+  }),
+);
+
+/* ================================================================
+   FINALIZE FORM E (stage 2: department head)
    ================================================================ */
 
 router.post(
   '/summaries/:summaryId/finalize',
-  allowRoles(...REVIEW_ROLES),
+  allowRoles(...FINALIZE_ROLES),
   asyncHandler(async (req, res) => {
     const summaryId = parseId(
       req.params.summaryId,
@@ -557,30 +718,21 @@ router.post(
       );
 
       if (form.state !== 'approved') {
-        const reasons = [];
-
-        if (form.missingGroups.length) {
-          reasons.push(
-            `no counted evaluation from: ${form.missingGroups.join(', ')}`,
-          );
-        }
-
-        for (const item of form.pendingGroups) {
-          reasons.push(
-            `${item.assigned - item.submitted} ${item.type} evaluator(s) have not submitted`,
-          );
-        }
-
-        if (!reasons.length) {
-          reasons.push(
-            'some submitted forms are not approved yet',
-          );
-        }
-
         throw httpError(
           409,
-          `Form E cannot be finalized yet: ${reasons.join('; ')}.`,
+          `Form E cannot be finalized yet: ${notReadyReasons(form).join('; ')}.`,
           'NOT_READY_TO_FINALIZE',
+        );
+      }
+
+      // Stage order: the committee endorses before the department head finalizes.
+      // (recomputeInstructorSummary above clears an endorsement whose data changed, but it only
+      // does so when the form is no longer fully approved, which was rejected just above.)
+      if (!summary.committee_endorsed_at) {
+        throw httpError(
+          409,
+          'The evaluation committee must endorse this Form E before the department head can finalize it.',
+          'COMMITTEE_ENDORSEMENT_REQUIRED',
         );
       }
 
@@ -608,6 +760,7 @@ router.post(
         details: {
           role: req.user.role,
           totalScore: form.total,
+          committeeEndorsedBy: Number(summary.committee_endorsed_by),
         },
         ipAddress: req.ip,
       });
@@ -641,13 +794,21 @@ router.get(
     const [[summary]] = await pool.execute(
       `SELECT
           s.id,
+          s.cycle_id,
           s.instructor_id,
           s.status,
+          s.committee_endorsed_at,
+          s.committee_endorsement_note,
+          s.finalized_at,
+          endorser.name AS committee_endorsed_by_name,
+          finalizer.name AS finalized_by_name,
           u.name AS instructor_name,
           cy.title AS cycle_title
        FROM evaluation_summaries s
        JOIN users u ON u.id = s.instructor_id
        JOIN evaluation_cycles cy ON cy.id = s.cycle_id
+       LEFT JOIN users endorser ON endorser.id = s.committee_endorsed_by
+       LEFT JOIN users finalizer ON finalizer.id = s.finalized_by
       WHERE s.id = ?`,
       [summaryId],
     );
@@ -721,6 +882,68 @@ router.get(
       (copy) => copy.recipient_type,
     );
 
+    // A finalized summary has, by definition, every evaluation approved.
+    // Only an unfinished one needs the (read-only) calculation to tell the two early stages apart.
+    const allApproved = finalized || summary.status === 'archived'
+      ? true
+      : (await calculateFormE(
+          pool,
+          summary.cycle_id,
+          summary.instructor_id,
+        )).state === 'approved';
+
+    const stage = deriveReportStage({
+      status: summary.status,
+      allApproved,
+      endorsed: Boolean(summary.committee_endorsed_at),
+      forwardedToVp: Boolean(vpAt),
+      copiesRecorded: recordedTypes.length,
+    });
+
+    // Who did what and when, in approval order (Committee -> Department Head -> College -> VP's Office).
+    const history = [];
+
+    if (summary.committee_endorsed_at) {
+      history.push({
+        stage: 'committee',
+        action: 'endorsed',
+        at: summary.committee_endorsed_at,
+        byName: summary.committee_endorsed_by_name || null,
+        note: summary.committee_endorsement_note || null,
+      });
+    }
+
+    if (summary.finalized_at && ['reviewed', 'archived'].includes(summary.status)) {
+      history.push({
+        stage: 'department_head',
+        action: 'finalized',
+        at: summary.finalized_at,
+        byName: summary.finalized_by_name || null,
+        note: null,
+      });
+    }
+
+    if (vpAt) {
+      history.push({
+        stage: 'college',
+        action: 'forwarded_to_vp',
+        at: vpAt,
+        byName: routing?.forwarded_to_vp_by_name || null,
+        note: null,
+      });
+    }
+
+    for (const copy of copies) {
+      history.push({
+        stage: 'vp_office',
+        action: 'copy_recorded',
+        recipientType: copy.recipient_type,
+        at: copy.recorded_at,
+        byName: copy.recorded_by_name || null,
+        note: null,
+      });
+    }
+
     sendData(res, {
       summary: {
         id: Number(summary.id),
@@ -728,6 +951,10 @@ router.get(
         cycleTitle: summary.cycle_title,
         status: summary.status,
       },
+
+      stage,
+      committeeEndorsed: Boolean(summary.committee_endorsed_at),
+      history,
 
       forwardedToVp: vpAt
         ? {

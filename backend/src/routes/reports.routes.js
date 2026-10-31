@@ -4,6 +4,7 @@ import { requireAuth, allowRoles } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 
 import { getFormESummary } from '../services/formEReportService.js';
+import { deriveReportStage } from '../utils/reportStage.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -158,6 +159,7 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
             s.department_head_average, s.department_head_weighted,
             s.peer_average, s.peer_weighted, s.self_average, s.self_weighted,
             s.total_score, s.status, s.finalized_by, s.finalized_at,
+            s.committee_endorsed_at,
                         (rt.forwarded_to_vp_at IS NOT NULL OR rt.forwarded_at IS NOT NULL) AS forwarded_to_vp,
             COALESCE(stats.total_assignments, 0) AS total_assignments,
             COALESCE(stats.submitted_assignments, 0) AS submitted_assignments,
@@ -206,6 +208,13 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
       approved_assignments: Number(row.approved_assignments),
       all_evaluations_approved: Number(row.all_evaluations_approved) === 1,
             forwarded_to_vp: Number(row.forwarded_to_vp) === 1,
+      // Where the report is in Committee -> Department Head -> College -> VP's Office.
+      report_stage: deriveReportStage({
+        status: row.status,
+        allApproved: Number(row.all_evaluations_approved) === 1,
+        endorsed: Boolean(row.committee_endorsed_at),
+        forwardedToVp: Number(row.forwarded_to_vp) === 1,
+      }),
       student_average: row.student_average === null ? null : Number(row.student_average),
       student_weighted: Number(row.student_weighted),
       department_head_average: row.department_head_average === null ? null : Number(row.department_head_average),

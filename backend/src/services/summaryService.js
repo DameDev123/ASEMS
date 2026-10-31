@@ -117,6 +117,8 @@ export async function recomputeInstructorSummary(connection, cycleId, instructor
 
   // A finalized summary stays final while every evaluation is still approved. If the data
   // changes afterwards (a new evaluator, a returned form) it drops back and must be finalized again.
+  // The committee endorsement follows the same rule (see the committee_endorsed_* columns below):
+  // it only survives while every evaluation is approved, so the committee endorses the data it saw.
   let status = STATUS_BY_STATE[form.state];
   if (form.state === 'approved' && existing[0]?.status === 'reviewed') status = 'reviewed';
 
@@ -137,7 +139,10 @@ export async function recomputeInstructorSummary(connection, cycleId, instructor
        self_average = VALUES(self_average), self_weighted = VALUES(self_weighted),
        total_score = VALUES(total_score), status = VALUES(status),
        finalized_by = IF(VALUES(status) = 'reviewed', COALESCE(evaluation_summaries.finalized_by, VALUES(finalized_by)), NULL),
-       finalized_at = IF(VALUES(status) = 'reviewed', COALESCE(evaluation_summaries.finalized_at, VALUES(finalized_at)), NULL)`,
+       finalized_at = IF(VALUES(status) = 'reviewed', COALESCE(evaluation_summaries.finalized_at, VALUES(finalized_at)), NULL),
+       committee_endorsed_by = IF(? = 'approved', committee_endorsed_by, NULL),
+       committee_endorsed_at = IF(? = 'approved', committee_endorsed_at, NULL),
+       committee_endorsement_note = IF(? = 'approved', committee_endorsement_note, NULL)`,
     [
       cycleId, instructorId,
       student.average, student.contribution ?? 0,
@@ -145,6 +150,7 @@ export async function recomputeInstructorSummary(connection, cycleId, instructor
       peer.average, peer.contribution ?? 0,
       self.average, self.contribution ?? 0,
       form.total ?? 0, status, finalizedBy, status,
+      form.state, form.state, form.state,
     ],
   );
   return { form, written: true, status };
