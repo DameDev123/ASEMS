@@ -3,6 +3,7 @@ import { pool } from '../config/database.js';
 import { httpError } from '../utils/http.js';
 import { writeAudit } from '../utils/audit.js';
 import { inTransaction, parseBody } from '../utils/db.js';
+import { checkSameCollege } from '../utils/leadershipScope.js';
 
 /**
  * Leadership evaluations, kept separate from the instructor workflow:
@@ -34,6 +35,33 @@ function assertType(type) {
     throw httpError(404, 'Unknown leadership evaluation type.', 'NOT_FOUND');
   }
   return LEADERSHIP_TYPES[type];
+}
+
+/* ------------------------------------------------------------------ */
+/* College scope (dean -> department head)                             */
+/* ------------------------------------------------------------------ */
+
+// Faculty ids (college / school / institute) a person belongs to, from their employee record.
+async function facultyIdsOf(connection, userId) {
+  const [rows] = await connection.execute(
+    `SELECT DISTINCT d.faculty_id AS facultyId
+       FROM employees e
+       JOIN departments d ON d.id = e.department_id
+      WHERE e.user_id = ? AND d.faculty_id IS NOT NULL`,
+    [Number(userId)],
+  );
+  return rows.map((row) => Number(row.facultyId));
+}
+
+// A dean evaluates only the department heads of their own college. The Academic Affairs VP ->
+// dean type has no such rule: the schema has no campus link between a VP and deans.
+async function assertDeanCollegeScope(connection, type, evaluatorId, evaluateeId, status) {
+  if (type !== 'dean_evaluates_department_head') return;
+  const result = checkSameCollege({
+    evaluatorFacultyIds: await facultyIdsOf(connection, evaluatorId),
+    evaluateeFacultyIds: await facultyIdsOf(connection, evaluateeId),
+  });
+  if (!result.ok) throw httpError(status, result.message, result.code);
 }
 
 /* ------------------------------------------------------------------ */
@@ -326,20 +354,33 @@ export async function publishVersion(user, versionId, ipAddress) {
 
 export async function listCandidates(type) {
   const info = assertType(type);
+  // The college (faculty) is returned so the assignment screen can offer only a dean's own
+  // department heads. createAssignment re-checks it on the server.
   const [evaluators] = await pool.execute(
-    "SELECT id, name FROM users WHERE role = ? AND status = 'active' ORDER BY name",
-    [info.evaluatorRole],
-  );
-  const [evaluatees] = await pool.execute(
-    `SELECT u.id, u.name, d.name AS departmentName
+    `SELECT u.id, u.name, f.id AS facultyId, f.name AS facultyName
        FROM users u
        LEFT JOIN employees e ON e.user_id = u.id
        LEFT JOIN departments d ON d.id = e.department_id
+       LEFT JOIN faculties f ON f.id = d.faculty_id
+      WHERE u.role = ? AND u.status = 'active'
+      ORDER BY u.name`,
+    [info.evaluatorRole],
+  );
+  const [evaluatees] = await pool.execute(
+    `SELECT u.id, u.name, d.name AS departmentName, f.id AS facultyId, f.name AS facultyName
+       FROM users u
+       LEFT JOIN employees e ON e.user_id = u.id
+       LEFT JOIN departments d ON d.id = e.department_id
+       LEFT JOIN faculties f ON f.id = d.faculty_id
       WHERE u.role = ? AND u.status = 'active'
       ORDER BY u.name`,
     [info.evaluateeRole],
   );
-  const clean = (r) => ({ ...r, id: Number(r.id) });
+  const clean = (r) => ({
+    ...r,
+    id: Number(r.id),
+    facultyId: r.facultyId === null || r.facultyId === undefined ? null : Number(r.facultyId),
+  });
   return {
     type,
     evaluatorRole: info.evaluatorRole,
@@ -372,6 +413,9 @@ export async function createAssignment(user, body, ipAddress) {
         throw httpError(422, `The ${label} must be an active user with the role "${role}".`, 'INVALID_PARTICIPANT');
       }
     }
+
+    // A dean can only be assigned department heads of their own college.
+    await assertDeanCollegeScope(connection, data.type, data.evaluatorId, data.evaluateeId, 422);
 
     const [[published]] = await connection.execute(
       `SELECT v.id
@@ -587,6 +631,10 @@ async function lockOwnEvaluation(connection, user, evaluationId) {
   if (evaluation.cycle_status !== 'active') {
     throw httpError(409, 'The evaluation cycle is not active.', 'CYCLE_NOT_ACTIVE');
   }
+  // Checked again when the dean acts, not only when the assignment was made: an assignment created
+  // before this rule existed, or a department head who moved to another college since, must not
+  // let a dean evaluate outside their college.
+  await assertDeanCollegeScope(connection, evaluation.evaluation_type, evaluation.evaluator_id, evaluation.evaluatee_id, 403);
   return evaluation;
 }
 
