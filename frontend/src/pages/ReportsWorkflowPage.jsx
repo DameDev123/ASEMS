@@ -7,6 +7,24 @@ const VIEW_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management
 const REVIEW_ROLES = ['committee', 'department_head'];
 const CHAIN_ROLES = ['admin', 'department_head', 'dean', 'management', 'academic_vp'];
 
+// Report approval order: Committee -> Department Head -> College -> VP's Office.
+const STAGE_LABELS = {
+  evaluations: 'Evaluations in review',
+  committee: 'Waiting for the committee',
+  department_head: 'Waiting for the department head',
+  college: 'Waiting for the college',
+  vp_office: "Waiting for the VP's office",
+  archive: 'Waiting for the archives',
+  archived: 'Archived',
+};
+const STAGE_TONE = { committee: 'status-amber', department_head: 'status-amber', college: 'status-blue', vp_office: 'status-blue' };
+const HISTORY_LABELS = {
+  endorsed: 'Committee endorsed Form E',
+  finalized: 'Department head finalized Form E',
+  forwarded_to_vp: "College forwarded the report to the VP's office",
+  copy_recorded: "VP's office recorded a copy",
+};
+
 
 const SUMMARY_TONE = {
   incomplete: 'status-amber',
@@ -35,6 +53,8 @@ export default function ReportsWorkflowPage({ user }) {
   const allowed = VIEW_ROLES.includes(user?.role);
   const canReview = REVIEW_ROLES.includes(user?.role);
   const canAdmin = user?.role === 'admin';
+  const canEndorse = user?.role === 'committee';
+  const canFinalize = user?.role === 'department_head';
   const canChain = CHAIN_ROLES.includes(user?.role);
   const [cycles, setCycles] = useState([]);
   const [cycleId, setCycleId] = useState('');
@@ -52,6 +72,7 @@ export default function ReportsWorkflowPage({ user }) {
   const [reopen, setReopen] = useState(null);
   const [reopenError, setReopenError] = useState('');
   const [finalize, setFinalize] = useState(null);
+  const [endorse, setEndorse] = useState(null);
   const [routing, setRouting] = useState(null);
   const [routingError, setRoutingError] = useState('');
   const [routingNotice, setRoutingNotice] = useState('');
@@ -140,6 +161,24 @@ export default function ReportsWorkflowPage({ user }) {
     }
   }
 
+  async function submitEndorsement() {
+    setSaving(true);
+    setReviewError('');
+    try {
+      await apiRequest(`/workflow/summaries/${endorse.item.id}/endorse`, {
+        method: 'POST',
+        body: JSON.stringify({ note: endorse.note.trim() || null }),
+      });
+      setEndorse(null);
+      setNotice('Form E endorsed. The department head can now finalize it.');
+      await load();
+    } catch (err) {
+      setReviewError(err.message || 'Unable to endorse Form E.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function submitFinalization() {
     if (!finalize?.strengths?.trim() || !finalize?.improvements?.trim()) {
       setReviewError('Complete both final-comment fields from Form E.');
@@ -216,7 +255,7 @@ export default function ReportsWorkflowPage({ user }) {
         <div>
           <p className="text-sm font-medium text-slate-500">Institutional reporting</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Reports &amp; workflow</h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">Review submitted forms, finalize official Form E comments, record the three required report copies, and track forwarding and archive events. This view does not impose an undocumented four-role approval chain.</p>
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">Review submitted forms, then move each Form E through the approval order: Committee, then Department Head, then College, then the VP's Office. A stage can act only after the one before it. The three report copies and the archive events are tracked here too.</p>
         </div>
         <button type="button" onClick={load} disabled={loading} className={button}><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
       </div>
@@ -247,7 +286,7 @@ export default function ReportsWorkflowPage({ user }) {
 
       <section className="panel-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
-          <div><h2 className="text-sm font-semibold text-slate-900">Form E summaries</h2><p className="mt-1 text-xs text-slate-500">A summary becomes final only after all assigned forms are approved and the Committee/Head records the final comments.</p></div>
+          <div><h2 className="text-sm font-semibold text-slate-900">Form E summaries</h2><p className="mt-1 text-xs text-slate-500">A summary becomes final only after all assigned forms are approved, the committee has endorsed it, and the department head records the final comments.</p></div>
           <div className="grid gap-2 sm:grid-cols-3">
             <select aria-label="Filter by cycle" value={cycleId} onChange={(event) => setCycleId(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm"><option value="">All cycles</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.title} ({cycle.academicYear ?? cycle.academic_year})</option>)}</select>
             <select aria-label="Filter by summary status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm"><option value="">All statuses</option><option value="incomplete">Incomplete</option><option value="complete">Complete</option><option value="reviewed">Reviewed</option><option value="archived">Archived</option></select>
@@ -265,10 +304,12 @@ export default function ReportsWorkflowPage({ user }) {
                   <td className="px-4 py-4 text-slate-600">{row.cycle_title}<span className="block text-xs text-slate-400">{row.academic_year}</span></td>
                   <td className="px-4 py-4 tabular-nums">{fmt(row.student_average)}</td><td className="px-4 py-4 tabular-nums">{fmt(row.department_head_average)}</td><td className="px-4 py-4 tabular-nums">{fmt(row.peer_average)}</td><td className="px-4 py-4 tabular-nums">{fmt(row.self_average)}</td>
                   <td className="px-4 py-4 font-semibold tabular-nums">{['reviewed', 'archived'].includes(row.status) ? fmt(row.total_score) : '—'}</td>
-                  <td className="px-4 py-4"><span className={`status-pill ${SUMMARY_TONE[row.status] || 'status-gray'}`}>{row.status}</span><span className="mt-1 block text-xs text-slate-400">{row.approved_assignments}/{row.total_assignments} forms approved</span></td>
+                  <td className="px-4 py-4"><span className={`status-pill ${SUMMARY_TONE[row.status] || 'status-gray'}`}>{row.status}</span><span className="mt-1 block text-xs text-slate-400">{row.approved_assignments}/{row.total_assignments} forms approved</span>{row.report_stage && <span className={`status-pill mt-1 ${STAGE_TONE[row.report_stage] || 'status-gray'}`}>{STAGE_LABELS[row.report_stage] || row.report_stage}</span>}</td>
                   <td className="min-w-52 px-4 py-4"><div className="flex flex-wrap gap-2">
                     <button type="button" className={button} onClick={() => window.location.assign(`/final-report?summaryId=${row.id}`)}><FileText size={13} /> Form E</button>
-                    {canReview && row.status === 'complete' && row.all_evaluations_approved && <button type="button" className={primaryButton} onClick={() => { setFinalize({ item: row, strengths: '', improvements: '' }); setReviewError(''); }}>Finalize</button>}
+                    {canEndorse && row.report_stage === 'committee' && <button type="button" className={primaryButton} onClick={() => { setEndorse({ item: row, note: '' }); setReviewError(''); }}>Endorse</button>}
+                    {canFinalize && row.report_stage === 'department_head' && <button type="button" className={primaryButton} onClick={() => { setFinalize({ item: row, strengths: '', improvements: '' }); setReviewError(''); }}>Finalize</button>}
+                    {canFinalize && row.report_stage === 'committee' && <span className="text-xs text-amber-700">Awaiting committee endorsement</span>}
                     {canChain && ['reviewed', 'archived'].includes(row.status) && <button type="button" className={button} onClick={() => openRouting(row)}><Send size={13} /> Reporting chain</button>}
                     {row.status === 'complete' && !row.all_evaluations_approved && <span className="text-xs text-amber-700">Awaiting form review</span>}
                   </div></td>
@@ -283,7 +324,7 @@ export default function ReportsWorkflowPage({ user }) {
       {review && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="review-title"><div className="panel-card w-full max-w-xl space-y-4 p-6">
         <h2 id="review-title" className="text-lg font-semibold text-slate-900">Review submitted form</h2><p className="text-sm text-slate-600">{review.item.form_title} for <strong>{review.item.instructor_name}</strong>. Average {fmt(review.item.overall_average)} / 5.</p>
         <label className="block text-sm font-medium text-slate-700">Review comment <span className="font-normal text-slate-400">(required for Return or Reject)</span><textarea rows={4} maxLength={10000} value={review.comment} onChange={(event) => setReview((current) => ({ ...current, comment: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-navy-800" /></label>
-        {reviewError && !finalize && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{reviewError}</p>}
+        {reviewError && !finalize && !endorse && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{reviewError}</p>}
         <div className="flex flex-wrap justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => setReview(null)}>Cancel</button><button type="button" className={primaryButton} disabled={saving} onClick={() => submitReview('approved')}>Approve form</button><button type="button" className={button} disabled={saving} onClick={() => submitReview('returned')}>Return</button><button type="button" className={`${button} border-rose-200 text-rose-700`} disabled={saving} onClick={() => submitReview('rejected')}>Reject</button></div>
       </div></div>}
 
@@ -292,6 +333,13 @@ export default function ReportsWorkflowPage({ user }) {
         <label className="block text-sm font-medium text-slate-700">Reason for reopening<textarea rows={4} maxLength={10000} required value={reopen.comment} onChange={(event) => setReopen((current) => ({ ...current, comment: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-navy-800" /></label>
         {reopenError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{reopenError}</p>}
         <div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => setReopen(null)}>Cancel</button><button type="button" className={primaryButton} disabled={saving} onClick={submitReopen}>Reopen for correction</button></div>
+      </div></div>}
+
+      {endorse && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="endorse-title"><div className="panel-card w-full max-w-xl space-y-4 p-6">
+        <h2 id="endorse-title" className="text-lg font-semibold text-slate-900">Endorse Form E</h2><p className="text-sm text-slate-600">{endorse.item.instructor_name} · {endorse.item.cycle_title}. All evaluations are approved. After your endorsement the department head can finalize the summary.</p>
+        <label className="block text-sm font-medium text-slate-700">Committee note <span className="font-normal text-slate-400">(optional)</span><textarea rows={3} maxLength={10000} value={endorse.note} onChange={(event) => setEndorse((current) => ({ ...current, note: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-navy-800" /></label>
+        {reviewError && endorse && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{reviewError}</p>}
+        <div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => setEndorse(null)}>Cancel</button><button type="button" className={primaryButton} disabled={saving} onClick={submitEndorsement}><CheckCircle2 size={14} /> Endorse Form E</button></div>
       </div></div>}
 
       {finalize && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="finalize-title"><div className="panel-card w-full max-w-2xl space-y-4 p-6">
@@ -305,6 +353,13 @@ export default function ReportsWorkflowPage({ user }) {
       {routing && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="routing-title"><div className="panel-card max-h-[92vh] w-full max-w-2xl space-y-4 overflow-y-auto p-6">
         <div className="flex items-start justify-between gap-4"><div><h2 id="routing-title" className="text-lg font-semibold text-slate-900">Reporting chain</h2><p className="mt-1 text-sm text-slate-500">{routing.summary.instructorName} · {routing.summary.cycleTitle}</p></div><button className={button} onClick={() => setRouting(null)}>Close</button></div>
         {routingError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{routingError}</p>}{routingNotice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{routingNotice}</p>}
+
+        <section className="space-y-2 rounded-lg border border-slate-200 p-3">
+          <h3 className="text-sm font-semibold text-slate-900">Approval order</h3>
+          <p className="text-xs text-slate-500">Committee → Department Head → College → VP's Office. Current stage: <strong>{STAGE_LABELS[routing.stage] || routing.stage}</strong>.</p>
+          {!routing.committeeEndorsed && <p className="text-xs text-slate-500">No committee endorsement is recorded for this report (it was finalized before this step was recorded).</p>}
+          {routing.history?.length > 0 && <ol className="space-y-1">{routing.history.map((entry, index) => <li key={`${entry.stage}-${entry.action}-${entry.recipientType ?? ''}-${index}`} className="text-xs text-slate-600"><span className="font-medium text-slate-800">{HISTORY_LABELS[entry.action] || entry.action}{entry.recipientType ? ` (${entry.recipientType})` : ''}</span> · {date(entry.at)} · {entry.byName || 'unknown user'}{entry.note ? ` — ${entry.note}` : ''}</li>)}</ol>}
+        </section>
 
         <section className="space-y-2 rounded-lg border border-slate-200 p-3">
           <h3 className="text-sm font-semibold text-slate-900">1. College / School / Institute administration</h3>
