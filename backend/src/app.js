@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -24,7 +26,13 @@ import organizationRoutes from './routes/organization.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import coursesRoutes from './routes/courses.routes.js';
 import translationRoutes from './routes/translation.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
 const app = express();
+const backendDirectory = path.dirname(fileURLToPath(import.meta.url));
+app.use('/uploads/profile-photos', express.static(
+  path.resolve(backendDirectory, '../uploads/profile-photos'),
+  { fallthrough: false, maxAge: '7d' },
+));
 
 app.disable('x-powered-by');
 app.use(helmet());
@@ -74,6 +82,7 @@ app.use('/api/organization', organizationRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/translation', translationRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
