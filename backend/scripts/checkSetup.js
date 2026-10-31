@@ -55,7 +55,11 @@ const REQUIRED_TABLES = [
   'evaluation_scores', 'evaluation_reviews', 'evaluation_summaries', 'audit_logs',
   'evaluation_report_distributions', 'evaluation_report_routing', 'evaluation_report_archives',
 ];
-const REQUIRED_SUMMARY_COLUMNS = ['committee_strengths', 'committee_improvements', 'finalized_by', 'finalized_at'];
+const REQUIRED_SUMMARY_COLUMNS = [
+  'committee_strengths', 'committee_improvements', 'finalized_by', 'finalized_at',
+  // Report approval order (run `npm run migrate`): the committee endorsement stage.
+  'committee_endorsed_by', 'committee_endorsed_at', 'committee_endorsement_note',
+];
 const EXPECTED_CRITERIA = { student: 30, department_head: 27, peer: 26, self: 62 };
 const ROLES = ['admin', 'student', 'teacher', 'department_head', 'committee', 'dean', 'management'];
 
@@ -118,7 +122,7 @@ try {
   const byRole = Object.fromEntries(roleRows.map((row) => [row.role, Number(row.active)]));
   for (const role of ROLES) {
     if (byRole[role] > 0) report('PASS', `${byRole[role]} active ${role} user(s)`);
-    else report(role === 'admin' ? 'FAIL' : 'WARN', `no active ${role} user`, role === 'management' ? 'nobody can record report copies or archive reports' : '');
+    else report(role === 'admin' ? 'FAIL' : 'WARN', `no active ${role} user`, role === 'management' ? 'nobody can forward finalized reports to the Academic Affairs VP office' : '');
   }
   const officeRole = process.env.ASEMS_REPORT_OFFICE_ROLE || 'management';
   console.log(`   (report office role in use: ${officeRole})`);
