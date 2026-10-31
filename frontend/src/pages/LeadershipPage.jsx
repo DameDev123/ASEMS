@@ -400,6 +400,14 @@ function AssignTab({ onChanged }) {
       .catch((err) => setError(err.message || 'Unable to load the people for this evaluation type.'));
   }, [type]);
 
+  // A dean evaluates only the department heads of their own college, so once a dean is chosen the
+  // list shows that college only. The server enforces the same rule.
+  const collegeScoped = type === 'dean_evaluates_department_head';
+  const chosenEvaluator = people.evaluators.find((p) => String(p.id) === String(form.evaluatorId));
+  const evaluateeOptions = collegeScoped && chosenEvaluator
+    ? people.evaluatees.filter((p) => chosenEvaluator.facultyId != null && p.facultyId === chosenEvaluator.facultyId)
+    : people.evaluatees;
+
   async function submit(event) {
     event.preventDefault();
     setError('');
@@ -458,11 +466,12 @@ function AssignTab({ onChanged }) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className={label}>
           Evaluator
-          <select className={`${field} mt-1`} value={form.evaluatorId} onChange={(e) => setForm({ ...form, evaluatorId: e.target.value })}>
+          <select className={`${field} mt-1`} value={form.evaluatorId} onChange={(e) => setForm({ ...form, evaluatorId: e.target.value, evaluateeId: '' })}>
             <option value="">Select the evaluator…</option>
             {people.evaluators.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
+                {collegeScoped && p.facultyName ? ` — ${p.facultyName}` : ''}
               </option>
             ))}
           </select>
@@ -471,15 +480,22 @@ function AssignTab({ onChanged }) {
           Person to be evaluated
           <select className={`${field} mt-1`} value={form.evaluateeId} onChange={(e) => setForm({ ...form, evaluateeId: e.target.value })}>
             <option value="">Select the person…</option>
-            {people.evaluatees.map((p) => (
+            {evaluateeOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
                 {p.departmentName ? ` — ${p.departmentName}` : ''}
+                {collegeScoped && p.facultyName ? ` (${p.facultyName})` : ''}
               </option>
             ))}
           </select>
         </label>
       </div>
+      {collegeScoped && chosenEvaluator && chosenEvaluator.facultyId == null && (
+        <p className="text-xs text-amber-800">This dean is not linked to a department, so their college cannot be verified. Link them to a department first.</p>
+      )}
+      {collegeScoped && chosenEvaluator && chosenEvaluator.facultyId != null && evaluateeOptions.length === 0 && (
+        <p className="text-xs text-amber-800">No active department head is linked to {chosenEvaluator.facultyName}.</p>
+      )}
       {people.evaluators.length === 0 && (
         <p className="text-xs text-amber-800">No active users with the evaluator role exist for this type yet.</p>
       )}
