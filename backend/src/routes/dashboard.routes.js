@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { pool } from '../config/database.js';
 import { requireAuth } from '../middlewares/auth.js';
@@ -14,11 +13,20 @@ router.get(
     const isAdmin = req.user.role === 'admin';
     const userId = Number(req.user.id);
 
-    // The authentication middleware provides req.user.id.
-    // Never use req.user.id here.
-    const assignmentWhere = isAdmin
-      ? ''
-      : 'WHERE evaluator_id = ?';
+    // Administrators see overall counts. The committee and the department head
+    // coordinate a department, so they see every assignment for instructors in
+    // their own department. Everyone else sees only the evaluations assigned to them.
+    const isDepartmentRole = ['committee', 'department_head'].includes(req.user.role);
+
+    const DEPARTMENT_INSTRUCTORS = `instructor_id IN (
+      SELECT user_id FROM employees
+       WHERE department_id = (SELECT department_id FROM employees WHERE user_id = ? LIMIT 1))`;
+
+    let scope = 'evaluator_id = ?';
+    if (isAdmin) scope = '';
+    else if (isDepartmentRole) scope = DEPARTMENT_INSTRUCTORS;
+
+    const assignmentWhere = scope ? `WHERE ${scope}` : '';
 
     const values = isAdmin ? [] : [userId];
 
@@ -61,7 +69,7 @@ router.get(
        JOIN users u ON u.id = a.instructor_id
        JOIN evaluation_cycles cy ON cy.id = a.cycle_id
        LEFT JOIN evaluations e ON e.assignment_id = a.id
-       ${isAdmin ? '' : 'WHERE a.evaluator_id = ?'}
+       ${scope ? `WHERE ${scope.replace(/\b(instructor_id|evaluator_id)\b/, 'a.$1')}` : ''}
        ORDER BY a.updated_at DESC
        LIMIT 8`,
       values,

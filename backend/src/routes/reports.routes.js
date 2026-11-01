@@ -4,7 +4,7 @@ import { requireAuth, allowRoles } from '../middlewares/auth.js';
 import { asyncHandler, httpError, sendData } from '../utils/http.js';
 
 import { getFormESummary } from '../services/formEReportService.js';
-import { deriveReportStage } from '../utils/reportStage.js';
+import { deriveReportStage } from '../services/reportStage.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -161,6 +161,7 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
             s.total_score, s.status, s.finalized_by, s.finalized_at,
             s.committee_endorsed_at,
                         (rt.forwarded_to_vp_at IS NOT NULL OR rt.forwarded_at IS NOT NULL) AS forwarded_to_vp,
+            COALESCE(dist.recorded_copies, 0) AS copies_recorded,
             COALESCE(stats.total_assignments, 0) AS total_assignments,
             COALESCE(stats.submitted_assignments, 0) AS submitted_assignments,
             COALESCE(stats.approved_assignments, 0) AS approved_assignments,
@@ -175,6 +176,12 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
        LEFT JOIN departments d ON d.id = emp.department_id
            LEFT JOIN faculties fac ON fac.id = d.faculty_id
        LEFT JOIN evaluation_report_routing rt ON rt.summary_id = s.id
+       LEFT JOIN (
+         SELECT summary_id, COUNT(*) AS recorded_copies
+           FROM evaluation_report_distributions
+          WHERE status = 'recorded'
+          GROUP BY summary_id
+       ) dist ON dist.summary_id = s.id
        LEFT JOIN (
          SELECT a.cycle_id, a.instructor_id,
 
@@ -214,6 +221,7 @@ router.get('/summaries', allowRoles(...REPORT_ROLES), asyncHandler(async (req, r
         allApproved: Number(row.all_evaluations_approved) === 1,
         endorsed: Boolean(row.committee_endorsed_at),
         forwardedToVp: Number(row.forwarded_to_vp) === 1,
+        copiesRecorded: Number(row.copies_recorded),
       }),
       student_average: row.student_average === null ? null : Number(row.student_average),
       student_weighted: Number(row.student_weighted),

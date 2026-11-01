@@ -209,6 +209,18 @@ function formatRole(role) {
     .join(' ');
 }
 
+// Only roles that fill in evaluation forms get "My evaluations". The committee, the college
+// administration and the dean coordinate or review reports (deans evaluate through the
+// leadership module), so the menu entry is removed for them.
+function withoutMyEvaluations(groups) {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.to !== '/my-evaluations'),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 function getNavigationGroups(role) {
   switch (role) {
     case 'admin':
@@ -218,7 +230,7 @@ function getNavigationGroups(role) {
       return instructorGroups;
 
     case 'dean':
-      return [...managementGroups, leadershipEvaluatorGroup, improvementGroup];
+      return [...withoutMyEvaluations(managementGroups), leadershipEvaluatorGroup, improvementGroup];
 
     case 'academic_vp':
       return academicVpGroups;
@@ -230,13 +242,13 @@ function getNavigationGroups(role) {
       return concernedOfficeGroups;
 
     case 'committee':
-      return [...managementGroups, participationGroup, improvementGroup];
+      return [...withoutMyEvaluations(managementGroups), participationGroup, improvementGroup];
 
     case 'department_head':
       return [...managementGroups, participationGroup, improvementGroup];
 
     case 'management':
-      return managementGroups;
+      return withoutMyEvaluations(managementGroups);
 
     case 'student':
     default:

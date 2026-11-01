@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, CheckCircle2, FileText, RefreshCw, Send, ShieldAlert } from 'lucide-react';
 import { apiRequest } from '../services/api.js';
 
 
-const VIEW_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management', 'academic_vp'];
+const VIEW_ROLES = ['committee', 'department_head', 'dean', 'management', 'academic_vp'];
 const REVIEW_ROLES = ['committee', 'department_head'];
-const CHAIN_ROLES = ['admin', 'department_head', 'dean', 'management', 'academic_vp'];
+const CHAIN_ROLES = ['department_head', 'dean', 'management', 'academic_vp'];
 
 // Report approval order: Committee -> Department Head -> College -> VP's Office.
 const STAGE_LABELS = {
@@ -45,6 +45,18 @@ const ARCHIVE_LEVELS = [
 ];
 
 const fmt = (value, digits = 2) => value === null || value === undefined ? '—' : Number(value).toFixed(digits);
+
+// Shows the points a component contributes (average on the 0-5 scale x its weight / 5),
+// so the column values add up to the Total /100. The raw average is shown beneath.
+function ScoreCell({ average, weight }) {
+  const hasValue = average !== null && average !== undefined && average !== '';
+  return (
+    <td className="px-4 py-4 tabular-nums">
+      {hasValue ? fmt((Number(average) * weight) / 5) : '—'}
+      {hasValue && <span className="block text-xs text-slate-400">avg {fmt(average)} / 5</span>}
+    </td>
+  );
+}
 const date = (value) => value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const button = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-lg bg-navy-900 px-3 py-2 text-xs font-semibold text-white hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50';
@@ -52,7 +64,7 @@ const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-lg 
 export default function ReportsWorkflowPage({ user }) {
   const allowed = VIEW_ROLES.includes(user?.role);
   const canReview = REVIEW_ROLES.includes(user?.role);
-  const canAdmin = user?.role === 'admin';
+  const canReopen = REVIEW_ROLES.includes(user?.role);
   const canEndorse = user?.role === 'committee';
   const canFinalize = user?.role === 'department_head';
   const canChain = CHAIN_ROLES.includes(user?.role);
@@ -78,6 +90,7 @@ export default function ReportsWorkflowPage({ user }) {
   const [routingNotice, setRoutingNotice] = useState('');
   const [distributionNote, setDistributionNote] = useState('');
   const [archiveReference, setArchiveReference] = useState('');
+  const chainActionBusy = useRef(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: '1', limit: '100' });
@@ -92,7 +105,7 @@ export default function ReportsWorkflowPage({ user }) {
     setError('');
     try {
       const requests = [apiRequest(`/reports/summaries?${query}`)];
-      if (REVIEW_ROLES.includes(user?.role) || user?.role === 'admin') {
+      if (REVIEW_ROLES.includes(user?.role)) {
         requests.push(apiRequest('/workflow/queue'));
       }
       const [summaryResult, queueResult] = await Promise.all(requests);
@@ -219,17 +232,29 @@ export default function ReportsWorkflowPage({ user }) {
   }
 
   async function runChainAction(path, body, successMessage) {
-    if (!routing) return;
+    if (!routing || chainActionBusy.current) return;
+    // Block a second click while the first request is still running.
+    chainActionBusy.current = true;
     setSaving(true);
     setRoutingError('');
+    const summaryId = routing.summary.id;
     try {
-      await apiRequest(`/workflow/summaries/${routing.summary.id}/${path}`, { method: 'POST', body: JSON.stringify(body) });
-      await loadChain(routing.summary.id);
+      await apiRequest(`/workflow/summaries/${summaryId}/${path}`, { method: 'POST', body: JSON.stringify(body) });
+      await loadChain(summaryId);
       setRoutingNotice(successMessage);
       await load();
     } catch (err) {
       setRoutingError(err.message || 'Unable to record this step.');
+      // The step may already have been recorded (double click or another window):
+      // reload so the panel shows the real state instead of an out-of-date one.
+      try {
+        await loadChain(summaryId);
+        await load();
+      } catch {
+        // Keep the original error message.
+      }
     } finally {
+      chainActionBusy.current = false;
       setSaving(false);
     }
   }
@@ -263,12 +288,14 @@ export default function ReportsWorkflowPage({ user }) {
       {notice && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
       {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
+      {/* The review queue is for committee members and department heads only. */}
+      {canReview && (
       <section className="panel-card overflow-hidden">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="text-sm font-semibold text-slate-900">Evaluation review queue</h2>
-          <p className="mt-1 text-xs text-slate-500">Committee members and department heads can review submitted forms within their permitted scope. Administrators can reopen rejected forms with a documented reason; reviewers cannot review their own submitted evaluation.</p>
+          <p className="mt-1 text-xs text-slate-500">Committee members and department heads can review submitted forms within their permitted scope. Reviewers can also reopen rejected forms with a documented reason. Reviewers cannot review or reopen their own evaluation, or one about themselves.</p>
         </div>
-        {loading ? <p className="p-8 text-sm text-slate-500">Loading submitted forms…</p> : queue.length === 0 ? <p className="px-6 py-10 text-center text-sm text-slate-500">No evaluation forms are waiting for review or administrator action.</p> : (
+        {loading ? <p className="p-8 text-sm text-slate-500">Loading submitted forms…</p> : queue.length === 0 ? <p className="px-6 py-10 text-center text-sm text-slate-500">No evaluation forms are waiting for review or reopening.</p> : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Instructor</th><th className="px-4 py-3">Evaluator</th><th className="px-4 py-3">Form</th><th className="px-4 py-3">Average</th><th className="px-4 py-3">Submitted</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
@@ -276,13 +303,14 @@ export default function ReportsWorkflowPage({ user }) {
                 {queue.map((item) => <tr key={item.evaluation_id} className="hover:bg-slate-50/60">
                   <td className="px-4 py-4 font-medium text-slate-900">{item.instructor_name}</td><td className="px-4 py-4 text-slate-600">{item.evaluator_name}</td><td className="px-4 py-4 text-slate-600">{item.form_code} · {item.form_title}</td><td className="px-4 py-4 tabular-nums">{fmt(item.overall_average)}</td><td className="px-4 py-4">{date(item.submitted_at)}</td>
                   <td className="px-4 py-4"><span className={`status-pill ${item.evaluation_status === 'rejected' ? 'status-gray' : 'status-blue'}`}>{item.evaluation_status}</span></td>
-                  <td className="px-4 py-4">{canReview && item.evaluation_status === 'submitted' ? <button type="button" className={button} onClick={() => { setReview({ item, comment: '' }); setReviewError(''); }}>Review form</button> : canAdmin && item.evaluation_status === 'rejected' ? <button type="button" className={button} onClick={() => { setReopen({ item, comment: '' }); setReopenError(''); }}>Reopen</button> : <span className="text-xs text-slate-400">Read-only</span>}</td>
+                  <td className="px-4 py-4">{canReview && item.evaluation_status === 'submitted' ? <button type="button" className={button} onClick={() => { setReview({ item, comment: '' }); setReviewError(''); }}>Review form</button> : canReopen && item.evaluation_status === 'rejected' ? <button type="button" className={button} onClick={() => { setReopen({ item, comment: '' }); setReopenError(''); }}>Reopen</button> : <span className="text-xs text-slate-400">Read-only</span>}</td>
                 </tr>)}
               </tbody>
             </table>
           </div>
         )}
       </section>
+      )}
 
       <section className="panel-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
@@ -302,7 +330,7 @@ export default function ReportsWorkflowPage({ user }) {
                   <td className="px-4 py-4 font-medium text-slate-900">{row.instructor_name}</td>
                   <td className="px-4 py-4 text-slate-600">{row.department_name || 'Department not configured'}<span className="block text-xs text-slate-400">{row.faculty_name || 'College not configured'}</span></td>
                   <td className="px-4 py-4 text-slate-600">{row.cycle_title}<span className="block text-xs text-slate-400">{row.academic_year}</span></td>
-                  <td className="px-4 py-4 tabular-nums">{fmt(row.student_average)}</td><td className="px-4 py-4 tabular-nums">{fmt(row.department_head_average)}</td><td className="px-4 py-4 tabular-nums">{fmt(row.peer_average)}</td><td className="px-4 py-4 tabular-nums">{fmt(row.self_average)}</td>
+                  <ScoreCell average={row.student_average} weight={40} /><ScoreCell average={row.department_head_average} weight={35} /><ScoreCell average={row.peer_average} weight={15} /><ScoreCell average={row.self_average} weight={10} />
                   <td className="px-4 py-4 font-semibold tabular-nums">{['reviewed', 'archived'].includes(row.status) ? fmt(row.total_score) : '—'}</td>
                   <td className="px-4 py-4"><span className={`status-pill ${SUMMARY_TONE[row.status] || 'status-gray'}`}>{row.status}</span><span className="mt-1 block text-xs text-slate-400">{row.approved_assignments}/{row.total_assignments} forms approved</span>{row.report_stage && <span className={`status-pill mt-1 ${STAGE_TONE[row.report_stage] || 'status-gray'}`}>{STAGE_LABELS[row.report_stage] || row.report_stage}</span>}</td>
                   <td className="min-w-52 px-4 py-4"><div className="flex flex-wrap gap-2">
@@ -318,7 +346,7 @@ export default function ReportsWorkflowPage({ user }) {
             </table>
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3 text-xs text-slate-500"><span>{pagination.total} summaries · page {pagination.page} of {Math.max(1, pagination.totalPages)}</span><span>Category-level weights are not defined by the supplied official forms; Form E will flag them instead of inventing allocations.</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3 text-xs text-slate-500"><span>{Math.max(pagination.total, summaries.length)} summaries · page {pagination.page} of {Math.max(1, pagination.totalPages)}</span><span>Category-level weights are not defined by the supplied official forms; Form E will flag them instead of inventing allocations.</span></div>
       </section>
 
       {review && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="review-title"><div className="panel-card w-full max-w-xl space-y-4 p-6">

@@ -111,6 +111,68 @@ function StatTile({ label, value, hint }) {
   );
 }
 
+// Circular progress for answered criteria.
+function ProgressRing({ done, total }) {
+  const percent = total ? Math.round((done / total) * 100) : 0;
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <div
+      className="relative h-14 w-14 shrink-0"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      aria-label={`${done} of ${total} criteria answered`}
+    >
+      <svg viewBox="0 0 56 56" className="h-14 w-14 -rotate-90" aria-hidden="true">
+        <circle cx="28" cy="28" r={radius} fill="none" stroke="currentColor" strokeWidth="5" className="text-slate-200" />
+        <circle
+          cx="28"
+          cy="28"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - percent / 100)}
+          className={`transition-all duration-300 ${percent === 100 ? 'text-emerald-500' : 'text-navy-800'}`}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-slate-900">
+        {percent}%
+      </span>
+    </div>
+  );
+}
+
+// Colour band for the score bar: visual only, it does not name a rating level.
+function bandClass(percent) {
+  if (percent === null || percent === undefined) return 'bg-slate-300';
+  if (percent >= 80) return 'bg-emerald-500';
+  if (percent >= 60) return 'bg-amber-500';
+  return 'bg-rose-500';
+}
+
+function ScoreTile({ label, value, unit, hint, percent }) {
+  return (
+    <div className="min-w-[132px]">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-0.5 flex items-baseline gap-1 leading-none">
+        <span className="text-2xl font-bold tabular-nums text-slate-900">{value}</span>
+        {unit && <span className="text-xs font-medium text-slate-500">{unit}</span>}
+      </p>
+      {percent !== undefined && (
+        <div className="mt-1.5 h-1.5 rounded-full bg-slate-100" aria-hidden="true">
+          <div className={`h-1.5 rounded-full transition-all duration-300 ${bandClass(percent)}`} style={{ width: `${percent ?? 0}%` }} />
+        </div>
+      )}
+      {hint && <p className="mt-1 text-[11px] text-slate-500">{hint}</p>}
+    </div>
+  );
+}
+
 function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
   const [assignment, setAssignment] = useState(null);
   const [version, setVersion] = useState(null);
@@ -165,7 +227,6 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
   );
   const editable = Boolean(assignment) && isEditable(assignment, readOnly);
   const remaining = criteria.length - stats.answered;
-  const progress = criteria.length ? Math.round((stats.answered / criteria.length) * 100) : 0;
 
   const options = useMemo(() => {
     if (!version) return [];
@@ -368,40 +429,36 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
 
       <div className="sticky top-[78px] z-10 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-          <div className="min-w-[180px] flex-1">
-            <div className="flex items-baseline justify-between text-xs">
-              <span className="font-semibold text-slate-700">{stats.answered}/{criteria.length} answered</span>
-              <span className="tabular-nums text-slate-500">{progress}%</span>
-            </div>
-            <div className="mt-1.5 h-2 rounded-full bg-slate-100" aria-hidden="true">
-              <div
-                className={`h-2 rounded-full transition-all ${progress === 100 ? 'bg-emerald-500' : 'bg-navy-800'}`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+          <ProgressRing done={stats.answered} total={criteria.length} />
+          <div className="min-w-[150px] flex-1">
+            <p className="text-sm font-semibold text-slate-800">{stats.answered} of {criteria.length} answered</p>
+            <p className="text-[11px] text-slate-500">
+              {remaining > 0 ? `${remaining} remaining` : 'All criteria answered'}
+              {stats.na ? ` · ${stats.na} N/A excluded` : ''}
+            </p>
             {saveText && (
-              <p className={`mt-1.5 text-[11px] ${saveState === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>{saveText}</p>
+              <p className={`mt-1 text-[11px] ${saveState === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>{saveText}</p>
             )}
           </div>
 
-          <StatTile
-            label="Live average"
-            value={stats.average === null ? '—' : `${fmt(stats.average)} / ${version.scaleMax}`}
-            hint={stats.na ? `${stats.na} N/A excluded` : undefined}
+          <ScoreTile
+            label="Average score"
+            value={stats.average === null ? '—' : fmt(stats.average)}
+            unit={`/ ${version.scaleMax}`}
+            percent={stats.percent}
+            hint={stats.average === null ? 'Answer a criterion to see it' : remaining > 0 ? 'Provisional' : 'Final for this form'}
           />
-          <StatTile
+          <ScoreTile
             label="Weighted score"
-            value={stats.weighted === null ? '—' : `${fmt(stats.weighted)} / ${weight}`}
+            value={stats.weighted === null ? '—' : fmt(stats.weighted)}
+            unit={`/ ${weight} pts`}
+            hint="Counts toward the final report"
           />
-          <div className="min-w-[120px]">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Performance</p>
-            <p className="text-lg font-bold tabular-nums leading-tight text-slate-900">
-              {stats.percent === null ? '—' : `${Math.round(stats.percent)}%`}
-            </p>
-            <div className="mt-1 h-1.5 rounded-full bg-slate-100" aria-hidden="true">
-              <div className="h-1.5 rounded-full bg-gold-500 transition-all" style={{ width: `${stats.percent ?? 0}%` }} />
-            </div>
-          </div>
+          <ScoreTile
+            label="Performance"
+            value={stats.percent === null ? '—' : `${Math.round(stats.percent)}%`}
+            hint="Of the maximum score"
+          />
 
           {editable && (
             <div className="ml-auto flex flex-wrap gap-2">
@@ -792,7 +849,7 @@ export default function MyEvaluationsPage({ user }) {
               {rows.length === 0 ? 'No evaluations assigned to you yet' : 'No evaluations match your filters'}
             </p>
             {rows.length === 0 && (
-              <p className="mt-1 text-sm text-slate-500">An administrator assigns evaluation tasks to you for each cycle.</p>
+              <p className="mt-1 text-sm text-slate-500">The committee or your department head assigns evaluation tasks to you for each cycle.</p>
             )}
           </div>
         ) : (
