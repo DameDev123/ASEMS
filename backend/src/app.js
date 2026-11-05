@@ -34,6 +34,7 @@ import auditRoutes from './routes/audit.routes.js';
 import coursesRoutes from './routes/courses.routes.js';
 import translationRoutes from './routes/translation.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
+import adminEvaluationsRoutes from './routes/adminEvaluations.routes.js';
 
 const app = express();
 
@@ -111,6 +112,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/translation', translationRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/admin-evaluations', adminEvaluationsRoutes);
 
 // Error handling
 app.use(notFoundHandler);
