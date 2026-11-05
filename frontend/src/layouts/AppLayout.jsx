@@ -21,6 +21,7 @@ import {
   Settings,
   Share2,
   ShieldCheck,
+  Upload,
   UserCheck,
   Users,
   X,
@@ -35,6 +36,7 @@ const adminGroups = [
     label: 'ORGANIZATION',
     items: [
       { label: 'Users & roles', to: '/users', icon: Users },
+      { label: 'Bulk import', to: '/imports', icon: Upload },
       { label: 'Departments', to: '/departments', icon: Building2 },
       { label: 'Academic units', to: '/academic-units', icon: GraduationCap },
       { label: 'Courses & instructors', to: '/academic', icon: BookOpen },

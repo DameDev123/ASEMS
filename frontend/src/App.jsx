@@ -13,6 +13,7 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
+import ImportPage from './pages/ImportPage.jsx';
 import CyclesPage from './pages/CyclesPage.jsx';
 import TasksPage from './pages/TasksPage.jsx';
 import MyEvaluationsPage from './pages/MyEvaluationsPage.jsx';
@@ -27,7 +28,6 @@ import AcademicUnitsPage from './pages/AcademicUnitsPage.jsx';
 import LeadershipHubPage from './pages/LeadershipHubPage.jsx';
 
 import ImprovementPage from './pages/ImprovementPage.jsx';
-
 
 import OfficesPage from './pages/OfficesPage.jsx';
 import ReferralsPage from './pages/ReferralsPage.jsx';
@@ -70,6 +70,7 @@ const placeholderPages = [
  */
 const implementedPages = {
   users: UsersPage,
+    imports: ImportPage,
   cycles: CyclesPage,
   tasks: TasksPage,
   'my-evaluations': MyEvaluationsPage,

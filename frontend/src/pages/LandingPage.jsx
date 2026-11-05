@@ -315,7 +315,7 @@ export default function LandingPage() {
             <div>
               <div className="asems-landing-pill inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Academic and Administrative Staff Evaluation
+                Academic and Administrative performance Evaluation Management System.
               </div>
 
               <p className="mt-8 text-xs font-extrabold uppercase tracking-[0.22em] text-emerald-700">
@@ -328,7 +328,7 @@ export default function LandingPage() {
               </h1>
 
               <p className="asems-landing-copy mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-                AAPEMS brings academic and administrative staff evaluation
+                AAPEMS brings Academic and Administrative performance Evaluation Management System.
                 activities together in one secure workspace—from evaluation
                 cycles and assignments to progress monitoring and authorized
                 reporting.
@@ -702,7 +702,7 @@ export default function LandingPage() {
             </div>
 
             <p className="asems-landing-copy mt-4 max-w-lg text-sm leading-6 text-slate-500">
-              Academic and Administrative Staff Evaluation Management System.
+              Academic and Administrative performance Evaluation Management System.
               A role-based workspace for evaluation activities, workflow
               coordination, and authorized reporting.
             </p>
@@ -747,7 +747,7 @@ export default function LandingPage() {
         <div className="mx-auto mt-8 flex max-w-7xl flex-col gap-2 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} AAPEMS · Ambo University</span>
           <span>
-            Academic and Administrative Staff Evaluation Management System
+            Academic and Administrative performance Evaluation Management System. Management System
           </span>
         </div>
       </footer>

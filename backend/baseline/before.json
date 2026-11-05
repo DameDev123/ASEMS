@@ -1,0 +1,320 @@
+{
+  "takenAt": "2026-11-04T10:28:17.214Z",
+  "database": "ambo_performance_evaluation",
+  "usersRoleType": "enum('admin','student','teacher','department_head','dean','committee','management','academic_vp','archives','concerned_office')",
+  "tables": {
+    "academic_units": {
+      "rows": 0,
+      "checksum": "0",
+      "schema": "21abf73951c997e5"
+    },
+    "audit_logs": {
+      "rows": 2120,
+      "checksum": "1239885259",
+      "schema": "05f5febde8851660"
+    },
+    "concerned_office_members": {
+      "rows": 1,
+      "checksum": "3151656137",
+      "schema": "8f6b299ce944dce3"
+    },
+    "concerned_offices": {
+      "rows": 3,
+      "checksum": "744820854",
+      "schema": "a9d4c14d9d1efdd9"
+    },
+    "course_instructors": {
+      "rows": 3,
+      "checksum": "2035346669",
+      "schema": "cf2619571a9b34b9"
+    },
+    "courses": {
+      "rows": 3,
+      "checksum": "2242275506",
+      "schema": "ad041780710e6c3b"
+    },
+    "departments": {
+      "rows": 3,
+      "checksum": "1091010173",
+      "schema": "7d9f7ae4af8e20dc"
+    },
+    "employees": {
+      "rows": 7,
+      "checksum": "367485932",
+      "schema": "c84a56a2e04e1e99"
+    },
+    "evaluation_archive_records": {
+      "rows": 21,
+      "checksum": "2063499576",
+      "schema": "f1d3fcafa15faeab"
+    },
+    "evaluation_assignments": {
+      "rows": 99,
+      "checksum": "3497182158",
+      "schema": "80549fb08d56af61"
+    },
+    "evaluation_cycles": {
+      "rows": 24,
+      "checksum": "1266875690",
+      "schema": "04a497bf5b3fac95"
+    },
+    "evaluation_forms": {
+      "rows": 4,
+      "checksum": "926967480",
+      "schema": "8897fa270a485093"
+    },
+    "evaluation_report_archives": {
+      "rows": 0,
+      "checksum": "0",
+      "schema": "3bcf75ffad853d97"
+    },
+    "evaluation_report_distributions": {
+      "rows": 21,
+      "checksum": "739113957",
+      "schema": "808c42b1ab4f6351"
+    },
+    "evaluation_report_routing": {
+      "rows": 12,
+      "checksum": "3819999988",
+      "schema": "c27cbd82abf242db"
+    },
+    "evaluation_reviews": {
+      "rows": 161,
+      "checksum": "3616313920",
+      "schema": "8ca9501461883490"
+    },
+    "evaluation_scores": {
+      "rows": 2387,
+      "checksum": "3532620984",
+      "schema": "1798a8c2788937a8"
+    },
+    "evaluation_summaries": {
+      "rows": 18,
+      "checksum": "1377911820",
+      "schema": "54e30681d366e190"
+    },
+    "evaluations": {
+      "rows": 69,
+      "checksum": "859150596",
+      "schema": "358fd02acbef6520"
+    },
+    "faculties": {
+      "rows": 4,
+      "checksum": "3788592835",
+      "schema": "c782251377387118"
+    },
+    "form_criteria": {
+      "rows": 232,
+      "checksum": "2460918120",
+      "schema": "e8f31cbe46aa9a0a"
+    },
+    "form_criteria_backup": {
+      "rows": 290,
+      "checksum": "2344674543",
+      "schema": "2d08bb12b5eade2d"
+    },
+    "form_sections": {
+      "rows": 29,
+      "checksum": "1371697665",
+      "schema": "5e120b9ce1fda9bd"
+    },
+    "form_sections_backup": {
+      "rows": 37,
+      "checksum": "863377934",
+      "schema": "94f9eb432f87283d"
+    },
+    "form_versions": {
+      "rows": 7,
+      "checksum": "2153076600",
+      "schema": "c41f1df5ddb3bcbc"
+    },
+    "improvement_referrals": {
+      "rows": 5,
+      "checksum": "2709249112",
+      "schema": "f975f794776e5719"
+    },
+    "instructors": {
+      "rows": 0,
+      "checksum": "0",
+      "schema": "6c8e5ea7d739be4b"
+    },
+    "leadership_criteria": {
+      "rows": 15,
+      "checksum": "2711563929",
+      "schema": "639c7dbb3d13919c"
+    },
+    "leadership_evaluations": {
+      "rows": 2,
+      "checksum": "63580270",
+      "schema": "c40e786b42db6f8a"
+    },
+    "leadership_form_versions": {
+      "rows": 3,
+      "checksum": "2096113668",
+      "schema": "45979d17d2928d07"
+    },
+    "leadership_forms": {
+      "rows": 2,
+      "checksum": "3661824602",
+      "schema": "1437c6a401b53c6e"
+    },
+    "leadership_scores": {
+      "rows": 10,
+      "checksum": "3148019940",
+      "schema": "d7922535fd839ad1"
+    },
+    "notifications": {
+      "rows": 1,
+      "checksum": "363904953",
+      "schema": "90874102d687aea5"
+    },
+    "schema_migrations": {
+      "rows": 1,
+      "checksum": "2424349572",
+      "schema": "263deeeb727692f8"
+    },
+    "student_departments": {
+      "rows": 3,
+      "checksum": "1607541194",
+      "schema": "42047f5ea84c018b"
+    },
+    "support_activities": {
+      "rows": 2,
+      "checksum": "1205664642",
+      "schema": "75382c0ad783c668"
+    },
+    "users": {
+      "rows": 15,
+      "checksum": "3711818248",
+      "schema": "d1800950bbab41a5"
+    }
+  },
+  "formE": [
+    {
+      "id": 1,
+      "cycle_id": 1,
+      "instructor_id": 5,
+      "status": "incomplete",
+      "total_score": "0.000"
+    },
+    {
+      "id": 2,
+      "cycle_id": 1,
+      "instructor_id": 4,
+      "status": "incomplete",
+      "total_score": "0.000"
+    },
+    {
+      "id": 4,
+      "cycle_id": 7,
+      "instructor_id": 7,
+      "status": "incomplete",
+      "total_score": "0.000"
+    },
+    {
+      "id": 6,
+      "cycle_id": 11,
+      "instructor_id": 7,
+      "status": "reviewed",
+      "total_score": "37.446"
+    },
+    {
+      "id": 10,
+      "cycle_id": 12,
+      "instructor_id": 7,
+      "status": "incomplete",
+      "total_score": "0.000"
+    },
+    {
+      "id": 14,
+      "cycle_id": 13,
+      "instructor_id": 7,
+      "status": "reviewed",
+      "total_score": "66.330"
+    },
+    {
+      "id": 34,
+      "cycle_id": 14,
+      "instructor_id": 7,
+      "status": "reviewed",
+      "total_score": "50.400"
+    },
+    {
+      "id": 54,
+      "cycle_id": 15,
+      "instructor_id": 7,
+      "status": "reviewed",
+      "total_score": "37.327"
+    },
+    {
+      "id": 98,
+      "cycle_id": 16,
+      "instructor_id": 7,
+      "status": "archived",
+      "total_score": "69.659"
+    },
+    {
+      "id": 115,
+      "cycle_id": 17,
+      "instructor_id": 7,
+      "status": "reviewed",
+      "total_score": "44.911"
+    },
+    {
+      "id": 142,
+      "cycle_id": 20,
+      "instructor_id": 4,
+      "status": "archived",
+      "total_score": "63.886"
+    },
+    {
+      "id": 155,
+      "cycle_id": 21,
+      "instructor_id": 7,
+      "status": "archived",
+      "total_score": "66.556"
+    },
+    {
+      "id": 164,
+      "cycle_id": 22,
+      "instructor_id": 4,
+      "status": "reviewed",
+      "total_score": "80.292"
+    },
+    {
+      "id": 173,
+      "cycle_id": 23,
+      "instructor_id": 7,
+      "status": "complete",
+      "total_score": "92.893"
+    },
+    {
+      "id": 183,
+      "cycle_id": 24,
+      "instructor_id": 7,
+      "status": "archived",
+      "total_score": "80.947"
+    },
+    {
+      "id": 206,
+      "cycle_id": 25,
+      "instructor_id": 7,
+      "status": "archived",
+      "total_score": "82.598"
+    },
+    {
+      "id": 215,
+      "cycle_id": 26,
+      "instructor_id": 7,
+      "status": "archived",
+      "total_score": "85.290"
+    },
+    {
+      "id": 224,
+      "cycle_id": 27,
+      "instructor_id": 7,
+      "status": "archived",
+      "total_score": "96.047"
+    }
+  ]
+}

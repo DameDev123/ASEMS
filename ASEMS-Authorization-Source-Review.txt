@@ -1767,7 +1767,7 @@ export default function LoginPage({ user, onLogin }) {
             </h1>
 
             <p className="mt-6 max-w-md text-sm leading-7 text-slate-300">
-              Access the Academic and Administrative Staff Evaluation
+              Access the Academic and Administrative performance Evaluation Management System.
               Management System to manage evaluation activities and
               authorized reports in one centralized workspace.
             </p>
@@ -1797,7 +1797,7 @@ export default function LoginPage({ user, onLogin }) {
                 Ambo University
               </p>
               <p className="mt-1 text-[11px] text-slate-500">
-                Academic and Administrative Staff Evaluation Management System
+                Academic and Administrative performance Evaluation Management System. Management System
               </p>
             </div>
 
@@ -1996,7 +1996,7 @@ export default function LoginPage({ user, onLogin }) {
               ASEMS Â· Ambo University
             </p>
             <p className="mt-1 text-[11px] text-slate-400">
-              Academic and Administrative Staff Evaluation Management System
+              Academic and Administrative performance Evaluation Management System. Management System
             </p>
           </footer>
         </section>
