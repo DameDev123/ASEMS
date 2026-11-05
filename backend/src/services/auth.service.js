@@ -1,4 +1,3 @@
-
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -6,11 +5,26 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { pool } from '../config/database.js';
 import { writeAudit } from '../utils/audit.js';
+import { LOCK_MINUTES, MAX_FAILED_LOGINS } from '../utils/passwordPolicy.js';
 
 const loginSchema = z.object({
-  email: z.string().trim().email().max(255),
+  // Despite its name, this field carries an email address OR a username (student ID).
+  email: z.string().trim().min(1).max(255),
   password: z.string().min(1).max(128),
-  selectedRole: z.enum(['admin', 'student', 'teacher', 'department_head', 'dean', 'committee', 'management', 'academic_vp', 'archives', 'concerned_office']).optional(),
+  selectedRole: z
+    .enum([
+      'admin',
+      'student',
+      'teacher',
+      'department_head',
+      'dean',
+      'committee',
+      'management',
+      'academic_vp',
+      'archives',
+      'concerned_office',
+    ])
+    .optional(),
 });
 
 const publicFields = `
@@ -44,44 +58,125 @@ function fail(message, statusCode, code) {
   throw error;
 }
 
+// Counts a wrong password and locks the account after MAX_FAILED_LOGINS in a row.
+// MySQL evaluates the SET list left to right, so locked_until must be assigned BEFORE
+// failed_login_attempts is changed (it reads the old counter).
+async function registerFailedLogin(userId) {
+  await pool.execute(
+    `UPDATE users
+        SET locked_until = IF(failed_login_attempts + 1 >= ?, NOW() + INTERVAL ? MINUTE, locked_until),
+            failed_login_attempts = IF(failed_login_attempts + 1 >= ?, 0, failed_login_attempts + 1)
+      WHERE id = ?`,
+    [MAX_FAILED_LOGINS, LOCK_MINUTES, MAX_FAILED_LOGINS, userId],
+  );
+
+  const [rows] = await pool.execute(
+    'SELECT (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked FROM users WHERE id = ?',
+    [userId],
+  );
+
+  if (rows[0] && Number(rows[0].is_locked) === 1) {
+    await writeAudit(pool, {
+      userId,
+      action: 'auth.account_locked',
+      entityType: 'user',
+      entityId: userId,
+      details: { failedAttempts: MAX_FAILED_LOGINS, lockMinutes: LOCK_MINUTES },
+    });
+  }
+}
+
 export async function loginUser(input) {
   const parsed = loginSchema.safeParse(input ?? {});
 
   if (!parsed.success) {
-    fail('Please provide a valid email and password.', 400, 'VALIDATION_ERROR');
+    fail(
+      'Please provide your email or ID and your password.',
+      400,
+      'VALIDATION_ERROR',
+    );
   }
 
-  const email = parsed.data.email.toLowerCase();
+  const identifier = parsed.data.email;
   const password = parsed.data.password;
 
+  // Usernames can never contain "@", so the two lookups cannot collide.
+  const byEmail = identifier.includes('@');
+
   const [rows] = await pool.execute(
-    `SELECT id, name, email, password, role, status, profile_photo
+    `SELECT id, name, email, password, role, status, profile_photo,
+            (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
+            (password_expires_at IS NOT NULL AND password_expires_at <= NOW()) AS password_expired,
+            failed_login_attempts, locked_until
        FROM users
-      WHERE email = ?
+      WHERE ${byEmail ? 'email' : 'username'} = ?
       LIMIT 1`,
-    [email],
+    [byEmail ? identifier.toLowerCase() : identifier],
   );
 
   const user = rows[0];
 
-  // Use the same response for unknown emails and incorrect passwords.
+  // Use the same response for unknown identifiers and incorrect passwords.
   if (!user) {
-    fail('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
+    fail('Invalid credentials.', 401, 'INVALID_CREDENTIALS');
   }
 
-  const passwordMatches = await bcrypt.compare(password, user.password);
+  // A locked account is refused before the password is checked, so guessing during the
+  // lock gains nothing and does not extend it.
+  if (Number(user.is_locked) === 1) {
+    fail(
+      `Too many failed sign-in attempts. Please try again in ${LOCK_MINUTES} minutes.`,
+      429,
+      'ACCOUNT_LOCKED',
+    );
+  }
+
+  const passwordMatches = await bcrypt.compare(
+    password,
+    user.password,
+  );
 
   if (!passwordMatches) {
-    fail('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
+    await registerFailedLogin(user.id);
+    fail('Invalid credentials.', 401, 'INVALID_CREDENTIALS');
+  }
+
+  // Checked only after the password is correct, so only its real holder learns it expired.
+  // Expired passwords can be renewed only by an administrator reset.
+  if (Number(user.password_expired) === 1) {
+    fail(
+      'Your password has expired. Please contact the system administrator to reset it.',
+      403,
+      'PASSWORD_EXPIRED',
+    );
   }
 
   if (user.status !== 'active') {
-    fail('Your account is unavailable.', 403, 'ACCOUNT_UNAVAILABLE');
+    fail(
+      'Your account is unavailable.',
+      403,
+      'ACCOUNT_UNAVAILABLE',
+    );
   }
 
-  // A role selected on the public access screen must match the account's assigned role.
-  if (parsed.data.selectedRole && user.role !== parsed.data.selectedRole) {
-    fail('This account is not assigned to the selected access category. Choose the correct category or use your authorized account.', 403, 'ROLE_MISMATCH');
+  // A role selected on the public access screen must match
+  // the account's assigned role.
+  if (
+    parsed.data.selectedRole &&
+    user.role !== parsed.data.selectedRole
+  ) {
+    fail(
+      'This account is not assigned to the selected access category. Choose the correct category or use your authorized account.',
+      403,
+      'ROLE_MISMATCH',
+    );
+  }
+
+  if (Number(user.failed_login_attempts) > 0 || user.locked_until) {
+    await pool.execute(
+      'UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?',
+      [user.id],
+    );
   }
 
   const token = jwt.sign(
@@ -130,7 +225,11 @@ export async function getCurrentUser(userId) {
   );
 
   if (!rows[0] || rows[0].status !== 'active') {
-    fail('User not found or account unavailable.', 404, 'USER_NOT_FOUND');
+    fail(
+      'User not found or account unavailable.',
+      404,
+      'USER_NOT_FOUND',
+    );
   }
 
   return publicUser(rows[0]);
@@ -141,38 +240,66 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(12).max(128),
 });
 
-export async function changePassword(userId, input, ipAddress = null) {
+export async function changePassword(
+  userId,
+  input,
+  ipAddress = null,
+) {
   const parsed = changePasswordSchema.safeParse(input ?? {});
 
   if (!parsed.success) {
-    fail('The new password must be between 12 and 128 characters.', 400, 'VALIDATION_ERROR');
+    fail(
+      'The new password must be between 12 and 128 characters.',
+      400,
+      'VALIDATION_ERROR',
+    );
   }
 
   const { currentPassword, newPassword } = parsed.data;
 
   if (currentPassword === newPassword) {
-    fail('The new password must be different from the current password.', 400, 'VALIDATION_ERROR');
+    fail(
+      'The new password must be different from the current password.',
+      400,
+      'VALIDATION_ERROR',
+    );
   }
 
   const [rows] = await pool.execute(
     'SELECT id, password, status FROM users WHERE id = ? LIMIT 1',
     [Number(userId)],
   );
+
   const user = rows[0];
 
   if (!user || user.status !== 'active') {
-    fail('User not found or account unavailable.', 404, 'USER_NOT_FOUND');
+    fail(
+      'User not found or account unavailable.',
+      404,
+      'USER_NOT_FOUND',
+    );
   }
 
   // 400 (not 401) so the browser does not discard the session.
-  const matches = await bcrypt.compare(currentPassword, user.password);
+  const matches = await bcrypt.compare(
+    currentPassword,
+    user.password,
+  );
 
   if (!matches) {
-    fail('The current password is incorrect.', 400, 'INVALID_CURRENT_PASSWORD');
+    fail(
+      'The current password is incorrect.',
+      400,
+      'INVALID_CURRENT_PASSWORD',
+    );
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await pool.execute('UPDATE users SET password = ? WHERE id = ?', [passwordHash, user.id]);
+
+  await pool.execute(
+    'UPDATE users SET password = ? WHERE id = ?',
+    [passwordHash, user.id],
+  );
 
   await writeAudit(pool, {
     userId: user.id,
@@ -183,7 +310,9 @@ export async function changePassword(userId, input, ipAddress = null) {
     ipAddress,
   });
 
-  return { changed: true };
+  return {
+    changed: true,
+  };
 }
 
 const profileSchema = z.object({
@@ -191,11 +320,19 @@ const profileSchema = z.object({
   address: z.string().trim().max(255).nullable(),
 });
 
-export async function updateProfile(userId, input, ipAddress = null) {
+export async function updateProfile(
+  userId,
+  input,
+  ipAddress = null,
+) {
   const parsed = profileSchema.safeParse(input ?? {});
 
   if (!parsed.success) {
-    fail('Please enter a valid phone number (up to 30 characters) and address.', 400, 'VALIDATION_ERROR');
+    fail(
+      'Please enter a valid phone number (up to 30 characters) and address.',
+      400,
+      'VALIDATION_ERROR',
+    );
   }
 
   const phone = parsed.data.phone || null;
@@ -211,13 +348,20 @@ export async function updateProfile(userId, input, ipAddress = null) {
     action: 'auth.profile_updated',
     entityType: 'user',
     entityId: Number(userId),
-    details: { fields: ['phone', 'address'] },
+    details: {
+      fields: ['phone', 'address'],
+    },
     ipAddress,
   });
 
   return getCurrentUser(userId);
 }
-export async function updateProfilePhoto(userId, profilePhoto, ipAddress = null) {
+
+export async function updateProfilePhoto(
+  userId,
+  profilePhoto,
+  ipAddress = null,
+) {
   await pool.execute(
     'UPDATE users SET profile_photo = ? WHERE id = ?',
     [profilePhoto, Number(userId)],

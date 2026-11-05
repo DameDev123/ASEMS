@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database.js';
@@ -78,8 +79,13 @@ router.get('/candidates', asyncHandler(async (req, res) => {
   const limit = departmentId === null ? '' : `AND u.id IN (${IN_DEPARTMENT})`;
   const [rows] = await pool.execute(
     `SELECT u.id, u.name, u.email, u.role,
-            (SELECT e.department_id FROM employees e WHERE e.user_id = u.id LIMIT 1) AS department_id
+            (SELECT e.department_id FROM employees e WHERE e.user_id = u.id LIMIT 1) AS department_id,
+            sd.department_id AS student_department_id,
+            sg.academic_year, sg.year_level, sg.section_code
        FROM users u
+       LEFT JOIN student_departments sd ON sd.user_id = u.id
+       LEFT JOIN student_academic_enrollments sae ON sae.user_id = u.id AND sae.is_current = 1
+       LEFT JOIN student_academic_groups sg ON sg.id = sae.academic_group_id
       WHERE u.status = 'active' AND u.role IN ('student', 'teacher', 'department_head') ${limit}
       ORDER BY u.name`,
     departmentId === null ? [] : [departmentId, departmentId],
@@ -90,7 +96,14 @@ router.get('/candidates', asyncHandler(async (req, res) => {
       id: Number(row.id),
       name: row.name,
       email: row.email,
-      departmentId: row.department_id === null || row.department_id === undefined ? null : Number(row.department_id),
+      departmentId: (row.role === 'student' ? row.student_department_id : row.department_id) == null
+        ? null : Number(row.role === 'student' ? row.student_department_id : row.department_id),
+      academicYear: row.academic_year ?? null,
+      yearLevel: row.year_level == null ? null : Number(row.year_level),
+      sectionCode: row.section_code ?? null,
+      meta: row.role === 'student' && row.academic_year
+        ? `${row.academic_year} · Year ${row.year_level} · Section ${row.section_code}`
+        : null,
     }));
 
   // Course assignments of the listed teachers (only active courses).
