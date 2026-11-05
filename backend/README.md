@@ -9,7 +9,7 @@ Express API integrated with the existing `ambo_performance_evaluation` MySQL sch
 3. Copy `.env.example` to `.env` and configure DB access and a unique random `JWT_SECRET` of at least 32 characters.
 4. Install dependencies: `npm install`.
 5. Start development server: `npm run dev`.
-6. API base URL: `http://localhost:5000/api`.
+6. API base URL: `http://localhost:5001/api`.
 
 The backend defaults to `DB_NAME=ambo_performance_evaluation`, matching the supplied dump. Create a least-privilege database user for the app rather than using a MySQL root account.
 

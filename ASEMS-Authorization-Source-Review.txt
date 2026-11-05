@@ -4514,7 +4514,7 @@ export default function UsersPage({ user }) {
 FILE: frontend\src\services\api.js
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 const TOKEN_KEY = 'asems_token';
 
@@ -4736,7 +4736,7 @@ const envSchema = z
       .int()
       .min(1)
       .max(65535)
-      .default(5000),
+      .default(5001),
 
     FRONTEND_ORIGIN: z
       .string()
@@ -7436,7 +7436,7 @@ import { z } from 'zod';
 
 // Shape of the editable content of a DRAFT form version.
 export const draftContentSchema = z.object({
-  instructions: z.string().trim().max(5000).nullable().optional(),
+  instructions: z.string().trim().max(5001).nullable().optional(),
   allowNa: z.boolean().optional(),
   sections: z
     .array(

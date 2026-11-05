@@ -83,7 +83,7 @@ async function requestAITranslations(language, texts) {
   let didTranslate = false;
 
   try {
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
     // Keep batches small and bounded; the server owns the API key.
     for (let offset = 0; offset < freshTexts.length; offset += 40) {
       const batch = freshTexts.slice(offset, offset + 40);
