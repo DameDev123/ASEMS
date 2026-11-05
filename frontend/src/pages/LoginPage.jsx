@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import {
@@ -23,9 +24,17 @@ function Brand() {
       </span>
 
       <span className="min-w-0">
-        <span className="block text-xl font-extrabold tracking-wide text-white">AAPEMS</span>
-        <span className="block text-xs font-semibold text-slate-200">Ambo University</span>
-        <span className="mt-0.5 block text-[11px] text-slate-400">Academic Affairs Staff Evaluation System</span>
+        <span className="block text-xl font-extrabold tracking-wide text-white">
+          AAPEMS
+        </span>
+
+        <span className="block text-xs font-semibold text-slate-200">
+          Ambo University
+        </span>
+
+        <span className="mt-0.5 block text-[11px] text-slate-400">
+          Academic and Administrative Performance Evaluation Management System.
+        </span>
       </span>
     </div>
   );
@@ -36,7 +45,7 @@ export default function LoginPage({ user, onLogin }) {
   const selectedRole = location.state?.selectedRole;
   const expectedRole = location.state?.expectedRole;
 
-  // Every account signs in with a username: students use their Student ID, staff use their email.
+  // Students use their Student ID; staff use their email.
   const isStudent = expectedRole === 'student';
 
   const [email, setEmail] = useState('');
@@ -98,10 +107,7 @@ export default function LoginPage({ user, onLogin }) {
           <div className="asems-login-form-panel p-6 sm:p-9">
             <div className="mb-8 flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                <ShieldCheck
-                  size={24}
-                  aria-hidden="true"
-                />
+                <ShieldCheck size={24} aria-hidden="true" />
               </span>
 
               <div>
@@ -210,23 +216,15 @@ export default function LoginPage({ user, onLogin }) {
                       setShowPassword((visible) => !visible)
                     }
                     aria-label={
-                      showPassword
-                        ? 'Hide password'
-                        : 'Show password'
+                      showPassword ? 'Hide password' : 'Show password'
                     }
                     aria-pressed={showPassword}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-emerald-500"
                   >
                     {showPassword ? (
-                      <EyeOff
-                        size={18}
-                        aria-hidden="true"
-                      />
+                      <EyeOff size={18} aria-hidden="true" />
                     ) : (
-                      <Eye
-                        size={18}
-                        aria-hidden="true"
-                      />
+                      <Eye size={18} aria-hidden="true" />
                     )}
                   </button>
                 </div>
