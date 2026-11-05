@@ -12,7 +12,7 @@ const envSchema = z
       .int()
       .min(1)
       .max(65535)
-      .default(5000),
+      .default(5001),
 
     FRONTEND_ORIGIN: z
       .string()

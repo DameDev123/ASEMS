@@ -39,7 +39,7 @@ npm install
 cp .env.example .env
 ```
 
-Set `VITE_API_BASE_URL=http://localhost:5000/api` for local development.
+Set `VITE_API_BASE_URL=http://localhost:5001/api` for local development.
 
 ## Run both applications
 
@@ -57,7 +57,7 @@ cd frontend
 npm run dev
 ```
 
-Open the URL printed by Vite (usually `http://localhost:5173`). Check process health at `http://localhost:5000/api/health`; the backend also logs whether MySQL connectivity was verified at startup.
+Open the URL printed by Vite (usually `http://localhost:5173`). Check process health at `http://localhost:5001/api/health`; the backend also logs whether MySQL connectivity was verified at startup.
 
 ## API documentation
 

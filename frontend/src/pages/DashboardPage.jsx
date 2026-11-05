@@ -629,6 +629,137 @@ function ConcernedOfficeDashboard() {
 }
 
 /* ------------------------------------------------------------------ */
+/* University / department archives                                    */
+/* ------------------------------------------------------------------ */
+
+function ArchivesDashboard() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await apiRequest('/archive/summaries?page=1&pageSize=100');
+      setItems(response?.data?.items ?? []);
+    } catch (err) {
+      setError(err.message || 'Unable to load the archive records.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const archived = items.filter((item) => item.status === 'archived');
+  const waiting = items.filter((item) => item.status !== 'archived');
+  const partlyDone = waiting.filter((item) => (item.recordedLevels ?? []).length > 0);
+
+  return (
+    <div className="space-y-8">
+      <section className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="asems-dashboard-eyebrow mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em]">
+            <span className="h-px w-6 bg-gold-500" />
+            Records
+          </div>
+
+          <h1 className="asems-text-primary text-2xl font-semibold tracking-tight sm:text-[30px]">
+            Archives overview
+          </h1>
+
+          <p className="asems-muted mt-2 max-w-2xl text-sm leading-6">
+            Final evaluation reports forwarded by the Academic Affairs VP office, and the three
+            archive levels (department, college, university) that each one needs.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="asems-secondary-button inline-flex items-center gap-2"
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+          {loading ? 'Refreshing…' : 'Refresh data'}
+        </button>
+      </section>
+
+      {error && (
+        <div role="alert" className="asems-error-panel rounded-xl border p-4 text-sm">
+          <p className="font-semibold">Archive records could not be loaded</p>
+          <p className="mt-1">{error}</p>
+        </div>
+      )}
+
+      {loading && items.length === 0 && !error ? (
+        <LoadingPanel />
+      ) : (
+        <>
+          <section aria-label="Archive statistics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Reports received" value={formatNumber(items.length)} note="Forwarded for archiving" icon={ClipboardCheck} tone="navy" />
+            <StatCard label="Waiting to archive" value={formatNumber(waiting.length)} note="Not archived at all three levels yet" icon={Clock3} tone="gold" />
+            <StatCard label="In progress" value={formatNumber(partlyDone.length)} note="Some levels already recorded" icon={Activity} tone="slate" />
+            <StatCard label="Archived" value={formatNumber(archived.length)} note="Recorded at all three levels" icon={CheckCircle2} tone="teal" />
+          </section>
+
+          <section className="asems-surface overflow-hidden rounded-xl border shadow-sm">
+            <div className="p-5 sm:p-6">
+              <SectionHeading
+                title="Next step"
+                description={
+                  waiting.length > 0
+                    ? `${formatNumber(waiting.length)} report(s) are waiting to be archived.`
+                    : 'No report is waiting to be archived.'
+                }
+                action={
+                  <DashboardLink to="/archive">
+                    Evaluation archives <ArrowRight size={15} />
+                  </DashboardLink>
+                }
+              />
+            </div>
+
+            {items.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-3 font-semibold">Instructor</th>
+                      <th className="px-5 py-3 font-semibold">Evaluation cycle</th>
+                      <th className="px-5 py-3 font-semibold">Levels recorded</th>
+                      <th className="px-5 py-3 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.slice(0, 8).map((item) => (
+                      <tr key={item.summaryId} className="border-t border-slate-100">
+                        <td className="px-5 py-3">{item.instructorName || '—'}</td>
+                        <td className="px-5 py-3">{item.cycleTitle || '—'}</td>
+                        <td className="px-5 py-3 tabular-nums">{(item.recordedLevels ?? []).length} / 3</td>
+                        <td className="px-5 py-3">
+                          <span className={`status-pill ${item.status === 'archived' ? 'status-green' : 'status-amber'}`}>
+                            {item.status === 'archived' ? 'Archived' : 'Waiting'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Dean, Academic VP, Department Head and College administration       */
 /* ------------------------------------------------------------------ */
 
@@ -1022,6 +1153,10 @@ function RoleDashboard({ role }) {
 export default function DashboardPage({ user }) {
   if (user?.role === 'concerned_office') {
     return <ConcernedOfficeDashboard />;
+  }
+
+  if (user?.role === 'archives') {
+    return <ArchivesDashboard />;
   }
 
   if (['dean', 'academic_vp', 'department_head', 'management'].includes(user?.role)) {

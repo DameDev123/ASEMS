@@ -25,7 +25,7 @@ function Brand() {
       <span className="min-w-0">
         <span className="block text-xl font-extrabold tracking-wide text-white">AAPEMS</span>
         <span className="block text-xs font-semibold text-slate-200">Ambo University</span>
-        <span className="mt-0.5 block text-[11px] text-slate-400">Academic Affairs Staff Evaluation System</span>
+        <span className="mt-0.5 block text-[11px] text-slate-400">Academic and Administrative performance Evaluation Management System.</span>
       </span>
     </div>
   );

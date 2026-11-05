@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import NotificationBell from '../components/NotificationBell.jsx';
 import { getAssetUrl } from '../services/api.js';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LanguageSwitcher } from '../i18n/LanguageLayer.jsx';
 import {
   BookOpen,
@@ -11,6 +11,7 @@ import {
   Archive,
   ChartNoAxesCombined,
   ChevronDown,
+  ChevronRight,
   ClipboardCheck,
   ClipboardList,
   FileText,
@@ -256,10 +257,42 @@ function getNavigationGroups(role) {
   }
 }
 
+// A group is "active" when the current page belongs to one of its items.
+function groupContainsPath(group, pathname) {
+  return group.items.some(({ to }) =>
+    to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`),
+  );
+}
+
 export default function AppLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const navigationGroups = getNavigationGroups(user?.role);
+  const { pathname } = useLocation();
+
+  // Every sidebar group is a dropdown, and only one is open at a time. The group that holds the
+  // current page starts open.
+  const [openGroups, setOpenGroups] = useState(() => {
+    const active = navigationGroups.find((group) => groupContainsPath(group, pathname));
+    return active ? { [active.label]: true } : {};
+  });
+
+  // When the page changes (link, back button, redirect), open the group it belongs to.
+  useEffect(() => {
+    const active = getNavigationGroups(user?.role).find((group) =>
+      groupContainsPath(group, pathname),
+    );
+    if (active) {
+      setOpenGroups((current) =>
+        current[active.label] && Object.keys(current).length === 1 ? current : { [active.label]: true },
+      );
+    }
+  }, [pathname, user?.role]);
+
+  function toggleGroup(label) {
+    // Only one group stays open: opening one closes the others; clicking the open one closes it.
+    setOpenGroups((current) => (current[label] ? {} : { [label]: true }));
+  }
 
   function closeMenus() {
     setMobileOpen(false);
@@ -272,7 +305,7 @@ export default function AppLayout({ user, onLogout }) {
   }
 
   return (
-    <div className="asems-app-shell min-h-screen bg-slate-50 text-slate-900">
+    <div className="asems-app-shell min-h-screen bg-slate-50 text-slate-900 lg:flex">
       {mobileOpen && (
         <button
           type="button"
@@ -283,12 +316,12 @@ export default function AppLayout({ user, onLogout }) {
       )}
 
       <aside
-        className={`asems-sidebar fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-navy-950 text-white transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-max max-w-[85vw] flex-col border-r border-slate-200 bg-white text-slate-900 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-[78px] shrink-0 items-center gap-3 border-b border-white/10 px-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/20">
+        <div className="flex h-[78px] shrink-0 items-center gap-3 border-b border-slate-200 px-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200">
             <img
               src="/mylogo.png"
               alt="Ambo University Logo"
@@ -298,7 +331,7 @@ export default function AppLayout({ user, onLogout }) {
 
           <div>
             <div className="text-lg font-semibold tracking-wide">AAPEMS</div>
-            <div className="text-[11px] text-slate-300">
+            <div className="text-[11px] text-slate-500">
               AMBO UNIVERSITY
             </div>
           </div>
@@ -306,7 +339,7 @@ export default function AppLayout({ user, onLogout }) {
           <button
             type="button"
             aria-label="Close navigation"
-            className="ml-auto rounded-lg p-2 text-slate-300 hover:bg-white/10 lg:hidden"
+            className="ml-auto rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
             onClick={() => setMobileOpen(false)}
           >
             <X size={18} />
@@ -314,68 +347,101 @@ export default function AppLayout({ user, onLogout }) {
         </div>
 
         <nav
-          className="scrollbar-thin flex-1 space-y-7 overflow-y-auto px-3 py-6"
+          className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-2 py-4"
           aria-label="Main navigation"
         >
-          {navigationGroups.map((group) => (
-            <section key={group.label}>
-              <h2 className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
-                {group.label}
-              </h2>
+          {navigationGroups.map((group, index) => {
+            const isOpen = Boolean(openGroups[group.label]);
+            const panelId = `nav-group-${index}`;
 
-              <div className="space-y-1">
-                {group.items.map(({ label, to, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end={to === '/'}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) =>
-                      `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition ${
-                        isActive
-                          ? 'bg-white/10 font-semibold text-white before:absolute before:left-0 before:h-7 before:w-1 before:rounded-r before:bg-gold-400'
-                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                      }`
-                    }
-                  >
-                    <Icon size={17} strokeWidth={1.8} />
-                    <span>{label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            </section>
-          ))}
-        </nav>
+            return (
+              <section key={group.label}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-100 ${
+                    isOpen ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="text-[11px] font-semibold tracking-[0.16em]">
+                    {group.label}
+                  </span>
+                  <ChevronRight
+                    size={15}
+                    aria-hidden="true"
+                    className={`shrink-0 transition-transform duration-200 ${
+                      isOpen ? 'rotate-90' : ''
+                    }`}
+                  />
+                </button>
 
-        <div className="shrink-0 border-t border-white/10 p-4">
+                <div
+                  id={panelId}
+                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                    isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-1 pb-2 pt-1">
+                      {group.items.map(({ label, to, icon: Icon }) => (
+                        <NavLink
+                          key={to}
+                          to={to}
+                          end={to === '/'}
+                          tabIndex={isOpen ? 0 : -1}
+                          onClick={() => setMobileOpen(false)}
+                          className={({ isActive }) =>
+                            `relative ml-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition ${
+                              isActive
+                                ? 'bg-slate-100 font-semibold text-slate-900 before:absolute before:left-0 before:h-7 before:w-1 before:rounded-r before:bg-gold-400'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            }`
+                          }
+                        >
+                          <Icon size={17} strokeWidth={1.8} />
+                          <span className="whitespace-nowrap">{label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+
+          {/* Settings has no sub-items, so it is a direct link in the same list. */}
           <NavLink
             to="/settings"
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+              `flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition ${
                 isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  ? 'bg-slate-100 text-slate-900'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
               }`
             }
           >
-            <Settings size={17} />
-            Settings
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">Settings</span>
+            <Settings size={15} aria-hidden="true" className="shrink-0" />
           </NavLink>
+        </nav>
 
-          <div className="mt-3 rounded-xl bg-white/5 p-3">
+        <div className="shrink-0 border-t border-slate-200 p-3">
+          <div className="w-0 min-w-full rounded-xl border border-slate-200 p-3">
             <div className="flex items-center gap-2 text-xs font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               AAPEMS workspace
             </div>
-            <p className="mt-1 text-[11px] leading-5 text-slate-400">
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">
               Academic evaluation and reporting
             </p>
           </div>
         </div>
       </aside>
 
-      <div className="min-h-screen lg:pl-[264px]">
+      <div className="min-h-screen min-w-0 flex-1">
         <header className="asems-header sticky top-0 z-20 flex h-[78px] items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7">
           <div className="flex min-w-0 items-center gap-3">
             <button

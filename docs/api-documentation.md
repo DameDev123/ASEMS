@@ -1,6 +1,6 @@
 # ASEMS API (schema-integrated first implementation)
 
-Base URL: `http://localhost:5000/api`
+Base URL: `http://localhost:5001/api`
 
 All JSON responses use `{ "success": true, "data": ... }` or `{ "success": false, "error": { "code": ..., "message": ... } }`. Except login and health, endpoints require `Authorization: Bearer <token>`.
 
