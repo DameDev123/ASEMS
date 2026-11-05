@@ -1,6 +1,6 @@
 import { confirmAction } from '../utils/confirmAction.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, RefreshCw, Save, Search, Send, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, Check, Lock, RefreshCw, Save, Search, Send, X } from 'lucide-react';
 import { apiRequest } from '../services/api.js';
 
 const EDITABLE = [null, undefined, 'draft', 'returned', 'rejected'];
@@ -44,7 +44,10 @@ function effectiveStatus(row) {
 }
 
 function isEditable(row, readOnly = false) {
-  return !readOnly && row.cycle_status === 'active' && EDITABLE.includes(row.evaluation_status ?? null);
+  // Submitted or approved evaluations are locked for every evaluator/actor.
+  // Returned/rejected evaluations may be edited only when the reviewer sends them back.
+  const status = row.evaluation_status ?? row.status ?? null;
+  return !readOnly && row.cycle_status === 'active' && EDITABLE.includes(status);
 }
 
 function formatRole(role) {
@@ -188,6 +191,12 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
   const [savedAt, setSavedAt] = useState(null);
   const [showMissing, setShowMissing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Row the form just moved the evaluator to: { id, skipped } (skipped = an earlier row was left unanswered).
+  const [attention, setAttention] = useState(null);
+  // Section-by-section filling: only the current section is shown, later ones stay locked.
+  const [activeSection, setActiveSection] = useState(0);
+  const [sectionError, setSectionError] = useState('');
+  const [flaggedSection, setFlaggedSection] = useState(null);
 
   const changeRef = useRef(0);
   const latest = useRef({ scores: {}, strengths: '', improvements: '' });
@@ -206,6 +215,13 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
       setAssignment(detail);
       setVersion(form);
       setScores(saved);
+      // Open the first section that is not finished yet (or the first one when all are done).
+      const firstOpen = (form?.sections ?? []).findIndex((section) => section.criteria.some(
+        (item) => saved[item.id] === undefined || saved[item.id] === null,
+      ));
+      setActiveSection(firstOpen === -1 ? 0 : firstOpen);
+      setSectionError('');
+      setFlaggedSection(null);
       setStrengths(detail.comment_strengths ?? '');
       setImprovements(detail.comment_improvements ?? '');
       setDirty(false);
@@ -227,6 +243,15 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
   );
   const editable = Boolean(assignment) && isEditable(assignment, readOnly);
   const remaining = criteria.length - stats.answered;
+
+  const sectionList = version?.sections ?? [];
+  const isAnswered = (item) => scores[item.id] !== undefined && scores[item.id] !== null;
+  const sectionComplete = (section) => section.criteria.every(isAnswered);
+  const firstOpenSection = sectionList.findIndex((section) => !sectionComplete(section));
+  // Furthest section the evaluator may open: the first unfinished one (all are open once every section is done).
+  const reachable = firstOpenSection === -1 ? Math.max(sectionList.length - 1, 0) : firstOpenSection;
+  const currentSection = Math.min(activeSection, reachable);
+  const isLastSection = currentSection >= sectionList.length - 1;
 
   const options = useMemo(() => {
     if (!version) return [];
@@ -301,14 +326,56 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
     setNotice('');
   }
 
+  // After an answer is chosen, move to the next criterion row. The target is always the FIRST
+  // unanswered row in form order, so a row that was skipped is never passed over: the form brings
+  // the evaluator back to it instead of moving on to a later criterion.
+  function advanceFrom(criterionId, nextScores) {
+    const answered = (item) => nextScores[item.id] !== undefined && nextScores[item.id] !== null;
+    // Stay inside the current section: the next section opens only with the arrow, once this one is finished.
+    const list = sectionList[currentSection]?.criteria ?? criteria;
+    const target = list.find((item) => !answered(item));
+    if (!target) {
+      setSectionError('');
+      setFlaggedSection(null);
+    }
+    window.setTimeout(() => {
+      if (target) {
+        const clickedAt = list.findIndex((item) => item.id === criterionId);
+        const targetAt = list.findIndex((item) => item.id === target.id);
+        setAttention({ id: target.id, skipped: targetAt < clickedAt });
+        document.getElementById(`criterion-${target.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        setAttention(null);
+        const goal = sectionList.length > 1 && !isLastSection ? 'section-next' : 'strengths';
+        document.getElementById(goal)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 250);
+  }
+
   function setScore(criterionId, value) {
-    setScores((current) => {
-      const next = { ...current };
-      if (next[criterionId] === value) delete next[criterionId];
-      else next[criterionId] = value;
-      return next;
-    });
+    // Enforce strict row-by-row completion in the full form order.
+    // A criterion can be changed only after every preceding criterion has an answer.
+    const criterionIndex = criteria.findIndex((item) => item.id === criterionId);
+    if (criterionIndex > 0) {
+      const previous = criteria.slice(0, criterionIndex);
+      const missingPrevious = previous.find((item) => !(
+        latest.current.scores[item.id] !== undefined &&
+        latest.current.scores[item.id] !== null
+      ));
+      if (missingPrevious) {
+        setError(`Please first finish criterion ${criterionIndex} before answering the next criterion.`);
+        document.getElementById(`criterion-${missingPrevious.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    const next = { ...latest.current.scores };
+    const removing = next[criterionId] === value;
+    if (removing) delete next[criterionId];
+    else next[criterionId] = value;
+    setScores(next);
     touch();
+    if (!removing) advanceFrom(criterionId, next);
   }
 
   async function handleBack() {
@@ -318,9 +385,46 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
 
   function jumpToNext() {
     const first = criteria.find((item) => scores[item.id] === undefined || scores[item.id] === null);
-    if (first) {
+    if (!first) return;
+    const at = sectionList.findIndex((section) => section.criteria.some((item) => item.id === first.id));
+    const switching = editable && at !== -1 && at !== currentSection;
+    if (switching) setActiveSection(at);
+    window.setTimeout(() => {
       document.getElementById(`criterion-${first.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, switching ? 120 : 0);
+  }
+
+  function goToSection(index) {
+    if (index < 0 || index >= sectionList.length) return;
+    if (index > reachable) {
+      const blocker = sectionList[firstOpenSection];
+      const open = blocker.criteria.filter((item) => !isAnswered(item)).length;
+      setFlaggedSection(firstOpenSection);
+      setSectionError(
+        `Please first finish the rest of "${blocker.title}" (${open} criteri${open === 1 ? 'on' : 'a'} still need${open === 1 ? 's' : ''} an answer) before opening this section.`,
+      );
+      if (firstOpenSection !== currentSection) setActiveSection(firstOpenSection);
+      return;
     }
+    setSectionError('');
+    setFlaggedSection(null);
+    setAttention(null);
+    setActiveSection(index);
+    window.setTimeout(() => document.getElementById('section-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  }
+
+  function nextSection() {
+    const section = sectionList[currentSection];
+    const open = section.criteria.filter((item) => !isAnswered(item));
+    if (open.length > 0) {
+      setFlaggedSection(currentSection);
+      setSectionError(
+        `Please first finish the rest of "${section.title}" (${open.length} criteri${open.length === 1 ? 'on' : 'a'} still need${open.length === 1 ? 's' : ''} an answer) before moving to the next section.`,
+      );
+      document.getElementById(`criterion-${open[0].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    goToSection(currentSection + 1);
   }
 
   async function handleSave() {
@@ -416,15 +520,25 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
           <span className={`status-pill ${STATUS_TONE[status] ?? 'status-gray'}`}>{STATUS_LABEL[status] ?? status}</span>
         </div>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{version.title}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Instructor <strong className="font-semibold text-slate-700">{assignment.instructor_name}</strong>
-          {' · '}{assignment.course_title}
-          {assignment.course_code ? ` (${assignment.course_code})` : ''}
-          {assignment.batch ? ` · Batch ${assignment.batch}` : ''}
-          {assignment.semester ? ` · Semester ${assignment.semester}` : ''}
-          {' · '}{assignment.cycle_title}
-        </p>
-        <p className="mt-1 text-xs text-slate-500">{TYPE_HINT[version.evaluatorType]}</p>
+        <section className="panel-card mt-3 overflow-hidden">
+          <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+            <h2 className="text-sm font-semibold text-slate-800">Evaluation details</h2>
+          </div>
+          <div className="space-y-1 px-5 py-4 text-sm text-slate-700">
+            <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+              <p><span className="font-semibold text-slate-900">Instructor:</span> {assignment.instructor_name}</p>
+              {assignment.department_name ? <p><span className="font-semibold text-slate-900">Department:</span> {assignment.department_name}</p> : null}
+            </div>
+            <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+              <p><span className="font-semibold text-slate-900">Course:</span> {assignment.course_title}</p>
+              {assignment.course_code ? <p><span className="font-semibold text-slate-900">Course Id:</span> ({assignment.course_code})</p> : null}
+            </div>
+            {assignment.batch ? <p><span className="font-semibold text-slate-900">Batch:</span> {assignment.batch}</p> : null}
+            {assignment.semester ? <p><span className="font-semibold text-slate-900">Semester:</span> {assignment.semester}</p> : null}
+            {assignment.cycle_title ? <p>{assignment.cycle_title}</p> : null}
+            <p className="pt-2 text-xs text-slate-500">{TYPE_HINT[version.evaluatorType]}</p>
+          </div>
+        </section>
       </div>
 
       <div className="sticky top-[78px] z-10 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
@@ -510,7 +624,45 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
         </div>
       )}
 
-      {version.sections.map((section) => {
+      {editable && sectionList.length > 1 && (
+        <nav id="section-top" aria-label="Evaluation sections" className="flex flex-wrap gap-2">
+          {sectionList.map((section, i) => {
+            const done = sectionComplete(section);
+            const locked = i > reachable;
+            const active = i === currentSection;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                aria-current={active ? 'step' : undefined}
+                onClick={() => goToSection(i)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  active
+                    ? 'border-navy-900 bg-navy-900 text-white'
+                    : locked
+                      ? 'border-slate-200 bg-slate-50 text-slate-400'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+                  done ? 'bg-emerald-500 text-white' : active ? 'bg-white/20' : 'bg-slate-200 text-slate-600'
+                }`}
+                >
+                  {done ? <Check size={12} /> : locked ? <Lock size={11} /> : i + 1}
+                </span>
+                {section.title}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      {editable && sectionError && (
+        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{sectionError}</div>
+      )}
+
+      {(editable ? [sectionList[currentSection]] : sectionList).filter(Boolean).map((section) => {
+        const sIndex = sectionList.indexOf(section);
         const sectionStats = computeScore(section.criteria, scores, weight, version.scaleMax);
         return (
           <section key={section.id} className="panel-card overflow-hidden">
@@ -524,13 +676,21 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
             <ul className="divide-y divide-slate-100">
               {section.criteria.map((criterion, index) => {
                 const value = scores[criterion.id];
-                const missing = showMissing && editable && (value === undefined || value === null);
+                const unanswered = value === undefined || value === null;
+                const globalIndex = criteria.findIndex((item) => item.id === criterion.id);
+                const previousCriteria = globalIndex > 0 ? criteria.slice(0, globalIndex) : [];
+                const previousMissing = previousCriteria.find((item) => !isAnswered(item));
+                const criterionLocked = editable && unanswered && Boolean(previousMissing);
+                const missing = (showMissing || flaggedSection === sIndex || (attention?.skipped && attention.id === criterion.id)) && editable && unanswered;
+                const pointed = editable && unanswered && attention?.id === criterion.id && !attention.skipped;
                 return (
                   <li
                     key={criterion.id}
                     id={`criterion-${criterion.id}`}
                     className={`flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between ${
-                      missing ? 'border-l-4 border-rose-400 bg-rose-50/50' : 'border-l-4 border-transparent'
+                      missing
+                        ? 'border-l-4 border-rose-400 bg-rose-50/50'
+                        : pointed ? 'border-l-4 border-navy-800 bg-slate-50' : 'border-l-4 border-transparent'
                     }`}
                   >
                     <p className="text-sm text-slate-800">
@@ -547,12 +707,14 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
                             role="radio"
                             aria-checked={selected}
                             title={option === 'NA' ? 'Not applicable' : labelFor(version, option)}
-                            disabled={!editable || busy}
+                            disabled={!editable || busy || criterionLocked}
                             onClick={() => setScore(criterion.id, option)}
                             className={`h-9 min-w-9 rounded-lg border px-2.5 text-sm font-medium transition disabled:cursor-not-allowed ${
                               selected
                                 ? 'border-navy-900 bg-navy-900 text-white'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:hover:bg-white'
+                                : criterionLocked
+                                  ? 'border-slate-200 bg-slate-100 text-slate-400 opacity-60'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:hover:bg-white'
                             }`}
                           >
                             {option === 'NA' ? 'N/A' : option}
@@ -568,6 +730,30 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
         );
       })}
 
+      {editable && sectionList.length > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            {currentSection > 0 && (
+              <button type="button" onClick={() => goToSection(currentSection - 1)} className={ROW_BUTTON}>
+                <ArrowLeft size={13} /> Previous section
+              </button>
+            )}
+          </div>
+          {!isLastSection && (
+            <div className="flex items-center gap-3">
+              {sectionComplete(sectionList[currentSection]) && (
+                <span className="text-xs font-medium text-emerald-700">Section complete. Continue with the arrow.</span>
+              )}
+              <button id="section-next" type="button" onClick={nextSection} className="primary-button">
+                Next section <ArrowRight size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(!editable || isLastSection) && (
+      <>
       <section className="panel-card grid gap-4 p-5 sm:grid-cols-2">
         <div>
           <label htmlFor="strengths" className="mb-1 block text-sm font-medium text-slate-700">Strengths</label>
@@ -609,6 +795,8 @@ function EvaluationForm({ assignmentId, onBack, readOnly = false }) {
             <Send size={15} /> Review &amp; submit
           </button>
         </div>
+      )}
+      </>
       )}
 
       {confirmOpen && (

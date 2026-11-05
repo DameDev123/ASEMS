@@ -5,6 +5,9 @@ const STORAGE_KEY = 'asems-language';
 const AI_CACHE_KEY = 'asems-ai-translation-cache-v1';
 const originalText = new WeakMap();
 const originalAttributes = new WeakMap();
+// What each text node held right after our last pass. If it differs on the next pass, the app (React)
+// has updated it since, so the new text is the new source and must not be reverted to the old one.
+const lastSeenText = new WeakMap();
 const pendingByLanguage = new Map();
 const inFlightByLanguage = new Map();
 const attemptedByLanguage = new Map();
@@ -139,6 +142,9 @@ function translatePage(language) {
 
   let node;
   while ((node = walker.nextNode())) {
+    if (originalText.has(node) && lastSeenText.has(node) && node.nodeValue !== lastSeenText.get(node)) {
+      originalText.set(node, node.nodeValue);
+    }
     if (!originalText.has(node)) originalText.set(node, node.nodeValue);
     const source = originalText.get(node);
     const trimmed = source.trim();
@@ -152,6 +158,7 @@ function translatePage(language) {
     } else if (!translated && language === 'en' && node.nodeValue !== source) {
       node.nodeValue = source;
     }
+    lastSeenText.set(node, node.nodeValue);
   }
 
   const attributeNames = ['placeholder', 'aria-label', 'title', 'aria-description'];
@@ -161,14 +168,20 @@ function translatePage(language) {
       cache = {};
       originalAttributes.set(element, cache);
     }
+    const lastSeen = (cache.lastSeen ||= {});
     attributeNames.forEach((attribute) => {
       if (!element.hasAttribute(attribute)) return;
       if (!(attribute in cache)) cache[attribute] = element.getAttribute(attribute);
+      // The app changed this attribute since our last pass (for example a live aria-label): keep its new value.
+      if (attribute in lastSeen && element.getAttribute(attribute) !== lastSeen[attribute]) {
+        cache[attribute] = element.getAttribute(attribute);
+      }
       const source = cache[attribute];
       const translated = translateText(source, dictionary) || (language !== 'en' ? getAITranslation(language, source) : undefined);
       if (!translated && language !== 'en' && source.trim().length <= 200) aiCandidates.add(source);
       if (translated && element.getAttribute(attribute) !== translated) element.setAttribute(attribute, translated);
       else if (!translated && language === 'en' && element.getAttribute(attribute) !== source) element.setAttribute(attribute, source);
+      lastSeen[attribute] = element.getAttribute(attribute);
     });
   });
 
