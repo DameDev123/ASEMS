@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import {
   Navigate,
@@ -26,9 +27,7 @@ import LeadershipEvaluationsPage from './pages/LeadershipEvaluationsPage.jsx';
 import DepartmentsPage from './pages/DepartmentsPage.jsx';
 import AcademicUnitsPage from './pages/AcademicUnitsPage.jsx';
 import LeadershipHubPage from './pages/LeadershipHubPage.jsx';
-
 import ImprovementPage from './pages/ImprovementPage.jsx';
-
 import OfficesPage from './pages/OfficesPage.jsx';
 import ReferralsPage from './pages/ReferralsPage.jsx';
 import ArchivePage from './pages/ArchivePage.jsx';
@@ -38,6 +37,15 @@ import FormsPage from './pages/FormsPage.jsx';
 import CoursesPage from './pages/CoursesPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
+// Administrative Staff Evaluation pages.
+// Import ONLY components currently exported by AdminEvaluationsPage.jsx.
+import {
+  AdminEvaluationDashboard,
+  AdminEvaluationPeriodsPage,
+  AdminPerformanceLevelsPage,
+  AdminAssignmentsPage,
+} from './pages/AdminEvaluationsPage.jsx';
+
 import {
   clearToken,
   getCurrentUser,
@@ -46,7 +54,6 @@ import {
 
 /**
  * Pages that have not yet been implemented.
- * Replace these placeholders when their real page components exist.
  */
 const placeholderPages = [
   {
@@ -54,23 +61,15 @@ const placeholderPages = [
     title: 'Dashboard',
     description: 'System overview.',
   },
-  {
-    path: 'reports',
-    title: 'Reports',
-    description: 'View reports.',
-  },
 ];
-  
-  
-
 
 /**
- * All implemented pages.
+ * All existing implemented pages.
  * Keep these paths consistent with AppLayout navigation links.
  */
 const implementedPages = {
   users: UsersPage,
-    imports: ImportPage,
+  imports: ImportPage,
   cycles: CyclesPage,
   tasks: TasksPage,
   'my-evaluations': MyEvaluationsPage,
@@ -80,8 +79,7 @@ const implementedPages = {
   departments: DepartmentsPage,
   'academic-units': AcademicUnitsPage,
   leadership: LeadershipHubPage,
-
-   improvement: ImprovementPage,
+  improvement: ImprovementPage,
   'leadership-forms': LeadershipFormsPage,
   'leadership-assignments': LeadershipAssignmentsPage,
   'leadership-evaluations': LeadershipEvaluationsPage,
@@ -90,8 +88,8 @@ const implementedPages = {
   archive: ArchivePage,
   audit: AuditTrailPage,
   settings: SettingsPage,
-     forms: FormsPage,
-       academic: CoursesPage,
+  forms: FormsPage,
+  academic: CoursesPage,
 };
 
 function LoadingScreen() {
@@ -123,6 +121,7 @@ function ProtectedWorkspace({ user, loading, onLogout }) {
     if (location.pathname === '/') {
       return <LandingPage />;
     }
+
     return <Navigate to="/login" replace />;
   }
 
@@ -137,10 +136,16 @@ export default function App() {
 
   useEffect(() => {
     function handleUserUpdated(event) {
-      if (event.detail) setUser(event.detail);
+      if (event.detail) {
+        setUser(event.detail);
+      }
     }
+
     window.addEventListener('asems:user-updated', handleUserUpdated);
-    return () => window.removeEventListener('asems:user-updated', handleUserUpdated);
+
+    return () => {
+      window.removeEventListener('asems:user-updated', handleUserUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -161,7 +166,6 @@ export default function App() {
           return;
         }
 
-        // Supports the API response shape used by this project.
         const currentUser =
           result?.data?.user ??
           result?.user ??
@@ -169,7 +173,6 @@ export default function App() {
 
         setUser(currentUser);
 
-        // A token without a valid user is not a valid restored session.
         if (!currentUser) {
           clearToken();
         }
@@ -212,6 +215,7 @@ export default function App() {
 
   return (
     <Routes>
+      {/* Login */}
       <Route
         path="/login"
         element={
@@ -228,6 +232,7 @@ export default function App() {
         }
       />
 
+      {/* Protected application workspace */}
       <Route
         element={
           <ProtectedWorkspace
@@ -237,9 +242,10 @@ export default function App() {
           />
         }
       >
+        {/* Main dashboard */}
+        <Route index element={<DashboardPage user={user} />} />
 
-<Route index element={<DashboardPage user={user} />} />
-
+        {/* Existing academic and organization pages */}
         {Object.entries(implementedPages).map(([path, Page]) => (
           <Route
             key={path}
@@ -248,6 +254,59 @@ export default function App() {
           />
         ))}
 
+        {/* Administrative Staff Evaluation */}
+        <Route
+          path="admin-evaluations"
+          element={<AdminEvaluationDashboard user={user} />}
+        />
+
+        <Route
+          path="admin-evaluation-periods"
+          element={<AdminEvaluationPeriodsPage user={user} />}
+        />
+
+        <Route
+          path="admin-performance-levels"
+          element={<AdminPerformanceLevelsPage user={user} />}
+        />
+
+        <Route
+          path="admin-assignments"
+          element={<AdminAssignmentsPage user={user} />}
+        />
+
+        {/* Administrative pages not yet exported by AdminEvaluationsPage.jsx */}
+        <Route
+          path="my-admin-evaluations"
+          element={
+            <PlaceholderPage
+              title="My administrative evaluations"
+              description="The employee and supervisor evaluation page has not yet been implemented."
+            />
+          }
+        />
+
+        <Route
+          path="admin-evaluations/:id/print"
+          element={
+            <PlaceholderPage
+              title="Administrative evaluation print view"
+              description="The administrative evaluation print component has not yet been implemented."
+            />
+          }
+        />
+
+        <Route
+          path="admin-evaluations/:id"
+          element={
+            <PlaceholderPage
+              title="Administrative evaluation details"
+              description="The administrative evaluation detail component has not yet been implemented."
+            />
+          }
+        />
+
+        {/* Other placeholder pages */}
         {placeholderPages.map((page) => (
           <Route
             key={page.path}
@@ -261,6 +320,7 @@ export default function App() {
           />
         ))}
 
+        {/* 404 */}
         <Route
           path="*"
           element={

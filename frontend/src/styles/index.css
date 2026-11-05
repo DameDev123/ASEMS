@@ -168,3 +168,72 @@ html body #root [role="columnheader"] {
   border-bottom-color: transparent !important;
   border-left-color: transparent !important;
 }
+/* =========================================================
+   ASEMS ADMINISTRATIVE EVALUATION PRINT STYLES
+   Official Six-Month Evaluation Form
+   ========================================================= */
+
+@page {
+  size: A4;
+  margin: 16mm 14mm;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    background: #fff !important;
+    min-width: 0 !important;
+  }
+
+  body {
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide application navigation and print controls */
+  .print\:hidden,
+  aside,
+  header,
+  nav,
+  .asems-header {
+    display: none !important;
+  }
+
+  .asems-app-shell,
+  .min-h-screen {
+    min-height: 0 !important;
+  }
+
+  /* Official evaluation document */
+  .admin-eval-print {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    color: #111 !important;
+  }
+
+  .admin-eval-print table {
+    page-break-inside: avoid;
+    border-collapse: collapse !important;
+  }
+
+  .admin-eval-print table th,
+  .admin-eval-print table td {
+    border: 1px solid #555 !important;
+    border-color: #555 !important;
+  }
+
+  .admin-eval-print h2,
+  .admin-eval-print h3 {
+    page-break-after: avoid;
+  }
+
+  .admin-eval-print p {
+    orphans: 3;
+    widows: 3;
+  }
+}
