@@ -98,22 +98,11 @@ async function getOwnedAssignment(connection, assignmentId, userId) {
   return rows[0];
 }
 
+
 // =====================================================
 // GET /api/evaluations
 // Get evaluation assignments belonging to the logged-in
 // evaluator only.
-//
-// Returns:
-// Instructor
-// College / Institute / School
-// Department
-// Course
-// Course ID
-// Batch
-// Semester
-// Section
-// Academic Year
-// Cycle
 // =====================================================
 
 router.get('/', asyncHandler(async (req, res) => {
@@ -174,15 +163,12 @@ router.get('/', asyncHandler(async (req, res) => {
 
         a.instructor_id,
 
-        COALESCE(
-          NULLIF(a.instructor_name, ''),
-          instructor.name
-        ) AS instructor_name,
+        instructor.name AS instructor_name,
 
         a.evaluator_id,
 
-        a.college_name,
-        a.department_name,
+        NULL AS college_name,
+        NULL AS department_name,
 
         f.id AS form_id,
         f.code AS form_code,
@@ -195,11 +181,10 @@ router.get('/', asyncHandler(async (req, res) => {
         a.course_code,
         a.batch,
         a.semester,
-        a.section,
 
-        a.academic_year,
-
-        a.evaluation_date,
+        NULL AS section,
+        NULL AS academic_year,
+        NULL AS evaluation_date,
 
         a.status AS assignment_status,
 
@@ -307,6 +292,7 @@ router.get('/', asyncHandler(async (req, res) => {
     })),
   });
 }));
+
 
 // =====================================================
 // PUT /api/evaluations/:assignmentId/draft

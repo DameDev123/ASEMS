@@ -10,11 +10,18 @@ const router = Router();
 
 router.use(requireAuth, allowRoles('committee', 'department_head'));
 
+// =====================================================
+// DEPARTMENT SCOPE
+// =====================================================
+
 async function scopeFor(db, user) {
   if (user.role === 'admin') return null;
 
   const [rows] = await db.execute(
-    'SELECT department_id FROM employees WHERE user_id = ? LIMIT 1',
+    `SELECT department_id
+     FROM employees
+     WHERE user_id = ?
+     LIMIT 1`,
     [Number(user.id)]
   );
 
@@ -32,9 +39,15 @@ async function scopeFor(db, user) {
 }
 
 const IN_DEPARTMENT = `
-  SELECT user_id FROM employees WHERE department_id = ?
+  SELECT user_id
+  FROM employees
+  WHERE department_id = ?
+
   UNION
-  SELECT user_id FROM student_departments WHERE department_id = ?
+
+  SELECT user_id
+  FROM student_departments
+  WHERE department_id = ?
 `;
 
 async function departmentUserIds(db, departmentId) {
@@ -43,8 +56,14 @@ async function departmentUserIds(db, departmentId) {
     departmentId
   ]);
 
-  return new Set(rows.map(row => Number(row.user_id)));
+  return new Set(
+    rows.map(row => Number(row.user_id))
+  );
 }
+
+// =====================================================
+// VALIDATION
+// =====================================================
 
 const id = z.number().int().positive();
 
@@ -53,7 +72,15 @@ const createSchema = z.object({
   instructorId: id,
   assignmentId: id,
 
-  batch: z.enum(['I', 'II', 'III', 'IV', 'V']).nullable().optional(),
+  batch: z.enum([
+    'I',
+    'II',
+    'III',
+    'IV',
+    'V'
+  ]).nullable().optional(),
+
+  semester: z.enum(['I', 'II']),
 
   studentIds: z.array(id).max(500).default([]),
 
@@ -71,16 +98,22 @@ const createSchema = z.object({
   section: z.enum(['I', 'II']),
 
   collegeName: z.string().trim().min(1).max(255),
+
   departmentName: z.string().trim().min(1).max(255),
+
   instructorName: z.string().trim().min(1).max(255),
+
   courseTitle: z.string().trim().min(1).max(255),
-  courseCode: z.string().trim().min(1).max(100),
-  academicYear: z.string().trim().min(1).max(30),
-  semester: z.string().trim().min(1).max(30),
+
+  courseCode: z.string().trim().min(1).max(50),
+
+  academicYear: z.string().trim().min(1).max(30)
 });
 
 function toTaskSemester(value) {
-  const text = String(value ?? '').trim().toUpperCase();
+  const text = String(value ?? '')
+    .trim()
+    .toUpperCase();
 
   if (/(^|[^A-Z0-9])(2|II|TWO|SECOND)([^A-Z0-9]|$)/.test(text)) {
     return 'II';
@@ -114,8 +147,6 @@ function parseId(value, label) {
 
 // =====================================================
 // GET /api/tasks/candidates
-// Load instructors, students, department heads and
-// instructor college/department/course information.
 // =====================================================
 
 router.get('/candidates', asyncHandler(async (req, res) => {
@@ -142,7 +173,8 @@ router.get('/candidates', asyncHandler(async (req, res) => {
        (
          SELECT d.name
          FROM employees e
-         JOIN departments d ON d.id = e.department_id
+         JOIN departments d
+           ON d.id = e.department_id
          WHERE e.user_id = u.id
          LIMIT 1
        ) AS department_name,
@@ -150,8 +182,10 @@ router.get('/candidates', asyncHandler(async (req, res) => {
        (
          SELECT f.name
          FROM employees e
-         JOIN departments d ON d.id = e.department_id
-         JOIN faculties f ON f.id = d.faculty_id
+         JOIN departments d
+           ON d.id = e.department_id
+         JOIN faculties f
+           ON f.id = d.faculty_id
          WHERE e.user_id = u.id
          LIMIT 1
        ) AS faculty_name
@@ -164,6 +198,7 @@ router.get('/candidates', asyncHandler(async (req, res) => {
          'teacher',
          'department_head'
        )
+
        ${limit}
 
      ORDER BY u.name`,
@@ -234,11 +269,16 @@ router.get('/candidates', asyncHandler(async (req, res) => {
     }
   }
 
+  const instructorList = instructors.map(person => ({
+    ...person,
+    assignments: byInstructor.get(person.id) ?? []
+  }));
+
   sendData(res, {
-    instructors: instructors.map(person => ({
-      ...person,
-      assignments: byInstructor.get(person.id) ?? []
-    })),
+    instructors: instructorList,
+
+    // Active teachers are also available as peer candidates.
+    peers: instructorList,
 
     students: pick('student'),
 
@@ -248,7 +288,7 @@ router.get('/candidates', asyncHandler(async (req, res) => {
 
 // =====================================================
 // GET /api/tasks
-// List tasks.
+// LIST TASKS
 // =====================================================
 
 router.get('/', asyncHandler(async (req, res) => {
@@ -320,10 +360,20 @@ router.get('/', asyncHandler(async (req, res) => {
 
        a.evaluation_date,
        a.section,
-       a.college_name,
-       a.department_name,
-       a.instructor_name AS instructor_name_snapshot,
-       a.academic_year,
+
+       d.name AS department_name,
+       fac.name AS college_name,
+
+       (
+         SELECT ci.academic_year
+         FROM course_instructors ci
+         JOIN courses c
+           ON c.id = ci.course_id
+         WHERE ci.instructor_id = a.instructor_id
+           AND c.course_code = a.course_code
+         ORDER BY ci.id DESC
+         LIMIT 1
+       ) AS academic_year,
 
        e.status AS evaluation_status
 
@@ -340,6 +390,15 @@ router.get('/', asyncHandler(async (req, res) => {
 
      JOIN users evaluator
        ON evaluator.id = a.evaluator_id
+
+     LEFT JOIN employees instructor_employee
+       ON instructor_employee.user_id = a.instructor_id
+
+     LEFT JOIN departments d
+       ON d.id = instructor_employee.department_id
+
+     LEFT JOIN faculties fac
+       ON fac.id = d.faculty_id
 
      LEFT JOIN evaluations e
        ON e.assignment_id = a.id
@@ -366,7 +425,7 @@ router.get('/', asyncHandler(async (req, res) => {
       formCode: row.form_code,
 
       instructorName: row.instructor_name,
-      instructorNameSnapshot: row.instructor_name_snapshot,
+      instructorNameSnapshot: row.instructor_name,
 
       evaluatorName: row.evaluator_name,
 
@@ -379,9 +438,9 @@ router.get('/', asyncHandler(async (req, res) => {
       evaluationDate: row.evaluation_date,
       section: row.section,
 
-      collegeName: row.college_name,
-      departmentName: row.department_name,
-      academicYear: row.academic_year,
+      collegeName: row.college_name ?? '',
+      departmentName: row.department_name ?? '',
+      academicYear: row.academic_year ?? '',
 
       status: row.status,
       evaluationStatus: row.evaluation_status
@@ -391,7 +450,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 // =====================================================
 // POST /api/tasks
-// Create tasks for all four evaluator types.
+// CREATE TASKS FOR ALL FOUR EVALUATOR TYPES
 // =====================================================
 
 router.post('/', asyncHandler(async (req, res) => {
@@ -451,7 +510,9 @@ router.post('/', asyncHandler(async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Verify cycle.
+    // -------------------------------------------------
+    // VERIFY CYCLE
+    // -------------------------------------------------
 
     const [cycles] = await connection.execute(
       `SELECT *
@@ -477,7 +538,9 @@ router.post('/', asyncHandler(async (req, res) => {
       );
     }
 
-    // Verify instructor's assigned course.
+    // -------------------------------------------------
+    // VERIFY COURSE ASSIGNMENT
+    // -------------------------------------------------
 
     const [assignmentRows] = await connection.execute(
       `SELECT
@@ -532,7 +595,24 @@ router.post('/', asyncHandler(async (req, res) => {
       );
     }
 
-    // Verify all evaluator roles.
+    const assignedSemester = toTaskSemester(
+      courseAssignment.semester
+    );
+
+    if (
+      assignedSemester &&
+      assignedSemester !== input.semester
+    ) {
+      throw httpError(
+        409,
+        'The selected semester does not match the instructor course assignment.',
+        'SEMESTER_MISMATCH'
+      );
+    }
+
+    // -------------------------------------------------
+    // VERIFY INSTRUCTOR AND EVALUATOR ROLES
+    // -------------------------------------------------
 
     const wanted = [
       [input.instructorId, 'teacher'],
@@ -582,7 +662,10 @@ router.post('/', asyncHandler(async (req, res) => {
     );
 
     const byId = new Map(
-      users.map(user => [Number(user.id), user])
+      users.map(user => [
+        Number(user.id),
+        user
+      ])
     );
 
     for (const [userId, role] of wanted) {
@@ -601,7 +684,9 @@ router.post('/', asyncHandler(async (req, res) => {
       }
     }
 
-    // Department Head must belong to the instructor's department.
+    // -------------------------------------------------
+    // VERIFY DEPARTMENT HEAD
+    // -------------------------------------------------
 
     if (input.departmentHeadId) {
       const [sameDepartment] = await connection.execute(
@@ -632,7 +717,9 @@ router.post('/', asyncHandler(async (req, res) => {
       }
     }
 
-    // Load published forms for all evaluator types.
+    // -------------------------------------------------
+    // LOAD PUBLISHED EVALUATION FORMS
+    // -------------------------------------------------
 
     const [versions] = await connection.execute(
       `SELECT
@@ -656,7 +743,9 @@ router.post('/', asyncHandler(async (req, res) => {
       ])
     );
 
-    // Create one task per selected evaluator.
+    // -------------------------------------------------
+    // PLAN EVALUATOR TASKS
+    // -------------------------------------------------
 
     const planned = [
       ...studentIds.map(evaluatorId => [
@@ -694,10 +783,14 @@ router.post('/', asyncHandler(async (req, res) => {
       }
     }
 
-    // Check duplicates.
+    // -------------------------------------------------
+    // CHECK DUPLICATE TASKS
+    // -------------------------------------------------
 
     const [existing] = await connection.execute(
-      `SELECT form_id, evaluator_id
+      `SELECT
+         form_id,
+         evaluator_id
 
        FROM evaluation_assignments
 
@@ -722,8 +815,17 @@ router.post('/', asyncHandler(async (req, res) => {
     let created = 0;
     let skipped = 0;
 
-    // Save each evaluator task with the same permanent
-    // instructor/course/date/section information.
+    // -------------------------------------------------
+    // INSERT TASKS
+    //
+    // IMPORTANT:
+    // Only insert columns that exist in
+    // evaluation_assignments.
+    //
+    // college_name, department_name,
+    // instructor_name and academic_year are not
+    // columns in your current database table.
+    // -------------------------------------------------
 
     for (const [type, evaluatorId] of planned) {
       const form = formFor.get(type);
@@ -748,10 +850,6 @@ router.post('/', asyncHandler(async (req, res) => {
 
            evaluation_date,
            section,
-           college_name,
-           department_name,
-           instructor_name,
-           academic_year,
 
            status
          )
@@ -759,7 +857,7 @@ router.post('/', asyncHandler(async (req, res) => {
          VALUES (
            ?, ?, ?, ?, ?,
            ?, ?, ?, ?,
-           ?, ?, ?, ?, ?, ?,
+           ?, ?,
            'pending'
          )`,
         [
@@ -775,21 +873,24 @@ router.post('/', asyncHandler(async (req, res) => {
           input.semester,
 
           input.evaluationDate,
-          input.section,
-          input.collegeName,
-          input.departmentName,
-          input.instructorName,
-          input.academicYear
+          input.section
         ]
       );
 
       created += 1;
     }
 
+    // -------------------------------------------------
+    // AUDIT
+    // -------------------------------------------------
+
     await writeAudit(connection, {
       userId: req.user.id,
+
       action: 'tasks.created',
+
       entityType: 'evaluation_cycle',
+
       entityId: input.cycleId,
 
       details: {
@@ -827,11 +928,14 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // =====================================================
 // DELETE /api/tasks/:id
-// Remove one unstarted task.
+// REMOVE ONE UNSTARTED TASK
 // =====================================================
 
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const taskId = parseId(req.params.id, 'task ID');
+  const taskId = parseId(
+    req.params.id,
+    'task ID'
+  );
 
   const departmentId = await scopeFor(pool, req.user);
 
@@ -908,16 +1012,22 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     }
 
     await connection.execute(
-      'DELETE FROM evaluation_assignments WHERE id = ?',
+      `DELETE FROM evaluation_assignments
+       WHERE id = ?`,
       [taskId]
     );
 
     await writeAudit(connection, {
       userId: req.user.id,
+
       action: 'task.deleted',
+
       entityType: 'evaluation_assignment',
+
       entityId: taskId,
+
       details: {},
+
       ipAddress: req.ip
     });
 
