@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/authorize.js';
@@ -8,16 +9,24 @@ import {
 
 const router = Router();
 
-// Administrator only. Responses may contain one-time initial passwords.
-router.use(authenticate, authorize('admin'));
+// Only Super Admin and legacy system admin can perform bulk imports.
+// Academic Admin and Administrative Admin are intentionally excluded.
+router.use(
+  authenticate,
+  authorize('super_admin', 'admin'),
+);
+
+// Initial credentials must never be cached.
 router.use((req, res, next) => {
   res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
   next();
 });
 
 router.post('/students', async (req, res, next) => {
   try {
     const data = await importStudents(req.body, req);
+
     res.status(data.dryRun ? 200 : 201).json({
       success: true,
       message: data.dryRun
@@ -33,6 +42,7 @@ router.post('/students', async (req, res, next) => {
 router.post('/instructors', async (req, res, next) => {
   try {
     const data = await importInstructors(req.body, req);
+
     res.status(data.dryRun ? 200 : 201).json({
       success: true,
       message: data.dryRun

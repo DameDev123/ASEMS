@@ -5,7 +5,7 @@ import { asyncHandler, sendData } from '../utils/http.js';
 
 // Read-only view of the audit trail. Administrators only.
 const router = Router();
-router.use(requireAuth, allowRoles('admin'));
+router.use(requireAuth, allowRoles('admin', 'super_admin'));
 
 function parseDetails(value) {
   if (value === null || value === undefined) return null;

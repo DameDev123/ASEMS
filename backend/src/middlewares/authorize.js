@@ -1,5 +1,13 @@
 const VALID_ROLES = new Set([
+  // Legacy administrator — retain compatibility with existing routes.
   'admin',
+
+  // New separated administrator roles.
+  'super_admin',
+  'academic_admin',
+  'administrative_admin',
+
+  // Existing system roles.
   'student',
   'teacher',
   'department_head',
@@ -49,5 +57,4 @@ export function authorize(...allowedRoles) {
   };
 }
 
-// Backward-compatible alias for existing route files.
 export const allowRoles = authorize;

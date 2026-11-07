@@ -4,6 +4,9 @@ import { apiRequest } from '../services/api.js';
 
 const ROLES = [
   'admin',
+  'super_admin',
+  'academic_admin',
+  'administrative_admin',
   'student',
   'teacher',
   'department_head',
@@ -21,13 +24,13 @@ const EMPTY_FORM = {
   name: '',
   email: '',
   role: 'student',
-  password: '',
   phone: '',
   gender: '',
-  date_of_birth: '',
-  address: '',
   id_number: '',
   profile_photo: '',
+  employeeType: '',
+  departmentId: '',
+  jobTitle: '',
 };
 
 function formatDate(value) {
@@ -78,7 +81,7 @@ const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
 export default function UsersPage({ user }) {
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role);
 
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState({
@@ -99,9 +102,29 @@ export default function UsersPage({ user }) {
   const [page, setPage] = useState(1);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [departments, setDepartments] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    apiRequest('/organization/departments?page=1&pageSize=100')
+      .then((result) => {
+        if (!cancelled) setDepartments(result?.data?.items || []);
+      })
+      .catch(() => {
+        if (!cancelled) setDepartments([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // One-time display of the server-generated initial password after account creation.
+  const [createdCredentials, setCreatedCredentials] = useState(null);
+  const [copied, setCopied] = useState(false);
   const [actionUserId, setActionUserId] = useState(null);
 
   const loadUsers = useCallback(async () => {
@@ -163,12 +186,11 @@ export default function UsersPage({ user }) {
       role: account.role || 'student',
       phone: account.phone || '',
       gender: account.gender || '',
-      date_of_birth: account.dateOfBirth
-        ? String(account.dateOfBirth).slice(0, 10)
-        : '',
-      address: account.address || '',
       id_number: account.idNumber || '',
       profile_photo: account.profilePhoto || '',
+      employeeType: account.employeeType || '',
+      departmentId: account.departmentId ? String(account.departmentId) : '',
+      jobTitle: account.jobTitle || '',
     });
     setError('');
     setNotice('');
@@ -192,10 +214,14 @@ export default function UsersPage({ user }) {
       role: form.role,
       phone: form.phone.trim() || null,
       gender: form.gender || null,
-      date_of_birth: form.date_of_birth || null,
-      address: form.address.trim() || null,
       id_number: form.id_number.trim() || null,
       profile_photo: form.profile_photo.trim() || null,
+      // Staff record. "administrative" makes the person appear in the
+      // Administrative Staff Evaluation > Employee assignments screen.
+      employeeType:
+        form.role === 'student' ? null : form.employeeType || null,
+      departmentId: form.departmentId ? Number(form.departmentId) : null,
+      jobTitle: form.jobTitle.trim() || null,
     };
 
     try {
@@ -206,14 +232,19 @@ export default function UsersPage({ user }) {
         });
         setNotice('User account updated successfully.');
       } else {
-        await apiRequest('/users', {
+        // No password is sent: the server generates the initial password and
+        // returns it once so it can be handed to the user.
+        const response = await apiRequest('/users', {
           method: 'POST',
-          body: JSON.stringify({
-            ...payload,
-            password: form.password,
-          }),
+          body: JSON.stringify(payload),
         });
         setNotice('User account created successfully.');
+        setCreatedCredentials({
+          name: response?.data?.user?.name || payload.name,
+          email: response?.data?.user?.email || payload.email,
+          initialPassword: response?.data?.initialPassword || '',
+        });
+        setCopied(false);
       }
 
       setDialogOpen(false);
@@ -560,7 +591,7 @@ export default function UsersPage({ user }) {
                 <p className="mt-1 text-sm text-slate-500">
                   {editingUser
                     ? 'Update the account details and assigned role.'
-                    : 'Create an account with an initial password.'}
+                    : 'A secure initial password is generated automatically after the account is created.'}
                 </p>
               </div>
               <button
@@ -624,20 +655,51 @@ export default function UsersPage({ user }) {
                   </select>
                 </Field>
 
-                {!editingUser && (
-                  <Field label="Initial password (minimum 12 characters)">
-                    <input
-                      required
-                      type="password"
-                      minLength={12}
-                      maxLength={128}
-                      name="password"
-                      value={form.password}
-                      onChange={updateField}
-                      className={inputClass}
-                      autoComplete="new-password"
-                    />
-                  </Field>
+                {form.role !== 'student' && (
+                  <>
+                    <Field label="Staff type">
+                      <select
+                        name="employeeType"
+                        value={form.employeeType}
+                        onChange={updateField}
+                        className={inputClass}
+                      >
+                        <option value="">Not a staff member</option>
+                        <option value="academic">Academic</option>
+                        <option value="administrative">Administrative</option>
+                      </select>
+                    </Field>
+
+                    {form.employeeType && (
+                      <>
+                        <Field label="Department (optional)">
+                          <select
+                            name="departmentId"
+                            value={form.departmentId}
+                            onChange={updateField}
+                            className={inputClass}
+                          >
+                            <option value="">No department yet</option>
+                            {departments.map((department) => (
+                              <option key={department.id} value={department.id}>
+                                {department.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+
+                        <Field label="Job title (optional)">
+                          <input
+                            maxLength={150}
+                            name="jobTitle"
+                            value={form.jobTitle}
+                            onChange={updateField}
+                            className={inputClass}
+                          />
+                        </Field>
+                      </>
+                    )}
+                  </>
                 )}
 
                 <Field label="Phone number">
@@ -664,16 +726,6 @@ export default function UsersPage({ user }) {
                   </select>
                 </Field>
 
-                <Field label="Date of birth">
-                  <input
-                    type="date"
-                    name="date_of_birth"
-                    value={form.date_of_birth}
-                    onChange={updateField}
-                    className={inputClass}
-                  />
-                </Field>
-
                 <Field label="University ID number">
                   <input
                     maxLength={40}
@@ -683,19 +735,6 @@ export default function UsersPage({ user }) {
                     className={inputClass}
                   />
                 </Field>
-
-                <div className="sm:col-span-2">
-                  <Field label="Address">
-                    <input
-                      maxLength={255}
-                      name="address"
-                      value={form.address}
-                      onChange={updateField}
-                      className={inputClass}
-                      autoComplete="street-address"
-                    />
-                  </Field>
-                </div>
               </div>
 
               <div className="flex flex-col-reverse justify-end gap-3 border-t border-slate-100 pt-5 sm:flex-row">
@@ -720,6 +759,75 @@ export default function UsersPage({ user }) {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {createdCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="credentials-dialog-title"
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="border-b border-slate-100 px-6 py-5">
+              <h2 id="credentials-dialog-title" className="text-lg font-bold text-slate-900">
+                Account created
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {createdCredentials.name} ({createdCredentials.email})
+              </p>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Initial password
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code
+                    data-testid="initial-password"
+                    className="flex-1 select-all rounded-lg bg-slate-100 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-slate-900"
+                  >
+                    {createdCredentials.initialPassword}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(createdCredentials.initialPassword);
+                        setCopied(true);
+                      } catch {
+                        setCopied(false);
+                      }
+                    }}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                This password is shown only once and cannot be viewed again. Give it to the user
+                through a secure channel and ask them to change it after signing in
+                (Settings &rarr; Change password).
+              </p>
+
+              <div className="flex justify-end border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatedCredentials(null);
+                    setCopied(false);
+                  }}
+                  className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
           </section>
         </div>
       )}

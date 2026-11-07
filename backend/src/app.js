@@ -22,7 +22,6 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import workflowRoutes from './routes/workflow.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import importsRoutes from './routes/imports.routes.js';
-
 import cyclesRoutes from './routes/cycles.routes.js';
 import tasksRoutes from './routes/tasks.routes.js';
 import resultsRoutes from './routes/results.routes.js';
@@ -35,8 +34,6 @@ import coursesRoutes from './routes/courses.routes.js';
 import translationRoutes from './routes/translation.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import adminEvaluationsRoutes from './routes/adminEvaluations.routes.js';
-
-// FIX: Import users routes
 import usersRoutes from './routes/users.routes.js';
 
 const app = express();
@@ -88,15 +85,20 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     data: {
-      name: 'ASEMS API',
+      name: 'AAPMES API',
       docs: 'See docs/api-documentation.md',
     },
   });
 });
 
-// API routes
+// Public routes
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+
+// Existing application routes
+// Keep authorization inside the route modules so that
+// each route can enforce its own role and workspace scope.
+
 app.use('/api/forms', formsRoutes);
 app.use('/api/assignments', assignmentsRoutes);
 app.use('/api/evaluations', evaluationsRoutes);
@@ -111,14 +113,14 @@ app.use('/api/leadership', leadershipRoutes);
 app.use('/api/improvement', improvementRoutes);
 app.use('/api/archive', archiveRoutes);
 app.use('/api/organization', organizationRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/translation', translationRoutes);
 app.use('/api/notifications', notificationsRoutes);
-app.use('/api/admin-evaluations', adminEvaluationsRoutes);
 
-// FIX: Register users API endpoint
-app.use('/api/users', usersRoutes);
+// Administrative evaluation routes
+app.use('/api/admin-evaluations', adminEvaluationsRoutes);
 
 // Error handling
 app.use(notFoundHandler);

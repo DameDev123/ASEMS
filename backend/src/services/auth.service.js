@@ -5,25 +5,32 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { pool } from '../config/database.js';
 import { writeAudit } from '../utils/audit.js';
+import {
+  newPasswordSchema,
+  PASSWORD_LENGTH_MESSAGE,
+} from '../utils/passwordPolicy.js';
 
 const loginSchema = z.object({
   // Despite its name, this field carries an email address OR a username (student ID).
   email: z.string().trim().min(1).max(255),
   password: z.string().min(1).max(128),
-  selectedRole: z
-    .enum([
-      'admin',
-      'student',
-      'teacher',
-      'department_head',
-      'dean',
-      'committee',
-      'management',
-      'academic_vp',
-      'archives',
-      'concerned_office',
-    ])
-    .optional(),
+  
+selectedRole: z.enum([
+  'admin',
+  'super_admin',
+  'academic_admin',
+  'administrative_admin',
+  'student',
+  'teacher',
+  'department_head',
+  'dean',
+  'committee',
+  'management',
+  'academic_vp',
+  'archives',
+  'concerned_office',
+]).optional(),
+
 });
 
 const publicFields = `
@@ -67,10 +74,9 @@ export async function loginUser(input) {
       'VALIDATION_ERROR',
     );
   }
-
-  const identifier = parsed.data.email;
-  const password = parsed.data.password;
-
+const identifier = parsed.data.email;
+const password = parsed.data.password;
+const selectedRole = parsed.data.selectedRole;
   // Usernames can never contain "@", so the two lookups cannot collide.
   const byEmail = identifier.includes('@');
 
@@ -108,17 +114,34 @@ export async function loginUser(input) {
 
   // A role selected on the public access screen must match
   // the account's assigned role.
-  if (
-    parsed.data.selectedRole &&
-    user.role !== parsed.data.selectedRole
-  ) {
+  
+if (selectedRole) {
+  const allowedRolesByCategory = {
+    admin: ['admin', 'super_admin'],
+    super_admin: ['super_admin'],
+    academic_admin: ['academic_admin', 'super_admin'],
+    administrative_admin: ['administrative_admin', 'super_admin'],
+    student: ['student'],
+    teacher: ['teacher'],
+    department_head: ['department_head'],
+    dean: ['dean'],
+    committee: ['committee'],
+    management: ['management'],
+    academic_vp: ['academic_vp'],
+    archives: ['archives'],
+    concerned_office: ['concerned_office'],
+  };
+
+  const allowedRoles = allowedRolesByCategory[selectedRole];
+
+  if (!allowedRoles || !allowedRoles.includes(user.role)) {
     fail(
       'This account is not assigned to the selected access category. Choose the correct category or use your authorized account.',
       403,
-      'ROLE_MISMATCH',
+      'ROLE_CATEGORY_MISMATCH',
     );
   }
-
+}
   const token = jwt.sign(
     {},
     env.JWT_SECRET,
@@ -177,7 +200,7 @@ export async function getCurrentUser(userId) {
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
-  newPassword: z.string().min(12).max(128),
+  newPassword: newPasswordSchema,
 });
 
 export async function changePassword(
@@ -189,7 +212,7 @@ export async function changePassword(
 
   if (!parsed.success) {
     fail(
-      'The new password must be between 12 and 128 characters.',
+      PASSWORD_LENGTH_MESSAGE,
       400,
       'VALIDATION_ERROR',
     );

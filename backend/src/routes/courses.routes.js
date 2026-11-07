@@ -6,7 +6,7 @@ import * as courses from '../services/courseService.js';
 
 // Course catalogue and instructor assignments (administrator only).
 const router = Router();
-router.use(requireAuth, allowRoles('admin'));
+router.use(requireAuth, allowRoles('admin', 'super_admin'));
 
 /* Instructor assignments */
 router.get('/assignments', asyncHandler(async (req, res) => sendData(res, await courses.listAssignments(req.query))));

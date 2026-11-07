@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import {
   Navigate,
@@ -37,13 +36,16 @@ import FormsPage from './pages/FormsPage.jsx';
 import CoursesPage from './pages/CoursesPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
-// Administrative Staff Evaluation pages.
-// Import ONLY components currently exported by AdminEvaluationsPage.jsx.
+// Administrative Staff Evaluation pages (six-month evaluation form).
 import {
   AdminEvaluationDashboard,
   AdminEvaluationPeriodsPage,
   AdminPerformanceLevelsPage,
   AdminAssignmentsPage,
+  AdminEvaluationReportsPage,
+  AdminEvaluationMinePage,
+  AdminEvaluationDetailPage,
+  AdminEvaluationPrintPage,
 } from './pages/AdminEvaluationsPage.jsx';
 
 import {
@@ -254,56 +256,40 @@ export default function App() {
           />
         ))}
 
-        {/* Administrative Staff Evaluation */}
+        {/* Administrative Staff Evaluation - administrators */}
         <Route
           path="admin-evaluations"
           element={<AdminEvaluationDashboard user={user} />}
         />
-
         <Route
           path="admin-evaluation-periods"
           element={<AdminEvaluationPeriodsPage user={user} />}
         />
-
         <Route
           path="admin-performance-levels"
           element={<AdminPerformanceLevelsPage user={user} />}
         />
-
         <Route
           path="admin-assignments"
           element={<AdminAssignmentsPage user={user} />}
         />
+        <Route
+          path="admin-evaluation-reports"
+          element={<AdminEvaluationReportsPage user={user} />}
+        />
 
-        {/* Administrative pages not yet exported by AdminEvaluationsPage.jsx */}
+        {/* Administrative Staff Evaluation - employee and supervisor workspace */}
         <Route
           path="my-admin-evaluations"
-          element={
-            <PlaceholderPage
-              title="My administrative evaluations"
-              description="The employee and supervisor evaluation page has not yet been implemented."
-            />
-          }
+          element={<AdminEvaluationMinePage user={user} />}
         />
-
-        <Route
-          path="admin-evaluations/:id/print"
-          element={
-            <PlaceholderPage
-              title="Administrative evaluation print view"
-              description="The administrative evaluation print component has not yet been implemented."
-            />
-          }
-        />
-
         <Route
           path="admin-evaluations/:id"
-          element={
-            <PlaceholderPage
-              title="Administrative evaluation details"
-              description="The administrative evaluation detail component has not yet been implemented."
-            />
-          }
+          element={<AdminEvaluationDetailPage user={user} />}
+        />
+        <Route
+          path="admin-evaluations/:id/print"
+          element={<AdminEvaluationPrintPage user={user} />}
         />
 
         {/* Other placeholder pages */}

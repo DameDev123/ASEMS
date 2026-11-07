@@ -109,14 +109,27 @@ const officialLinks = [
     icon: Send,
   },
 ];
-
 const accessRoles = [
   {
     title: 'Administrator',
     role: 'admin',
     description:
-      'Manage user accounts, roles, evaluation setup, and authorized system administration.',
+      'Super Admin and authorized system administrators. Manage system-wide administration and access.',
     icon: ShieldCheck,
+  },
+  {
+    title: 'Academic Admin',
+    role: 'academic_admin',
+    description:
+      'Manage academic staff evaluation cycles, assignments, evaluation forms, and academic reports.',
+    icon: GraduationCap,
+  },
+  {
+    title: 'Administrative Admin',
+    role: 'administrative_admin',
+    description:
+      'Manage administrative staff evaluation cycles, assignments, evaluation forms, and administrative reports.',
+    icon: BriefcaseBusiness,
   },
   {
     title: 'Students',
@@ -161,15 +174,13 @@ const accessRoles = [
     icon: Landmark,
   },
   {
-    title:
-      'Academic Affairs Vice President / Academic Affairs Vice Director',
+    title: 'Academic Affairs Vice President / Academic Affairs Vice Director',
     role: 'academic_vp',
     description: 'Oversee academic evaluation workflows and reports.',
     icon: BriefcaseBusiness,
   },
   {
-    title:
-      "Academic Affairs Vice President's Office / Campus Academic Vice Director",
+    title: "Academic Affairs Vice President's Office / Campus Academic Vice Director",
     role: 'academic_vp',
     description: 'Coordinate academic affairs evaluation activities.',
     icon: FileCheck2,
@@ -806,34 +817,36 @@ export default function LandingPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {accessRoles.map(({ title, description, icon: Icon }) => (
-                  <button
-                    key={title}
-                    type="button"
-                    onClick={() =>
-                      chooseRole({
-                        title,
-                        role: accessRoles.find(
-                          (item) => item.title === title,
-                        )?.role,
-                      })
-                    }
-                    className="asems-role-option group flex min-h-[118px] items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:p-5"
-                  >
-                    <span className="asems-role-option-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition group-hover:bg-emerald-200">
-                      <Icon size={24} aria-hidden="true" />
-                    </span>
+                
 
-                    <span className="min-w-0">
-                      <span className="asems-role-option-title block text-sm font-bold text-slate-900 sm:text-base">
-                        {title}
-                      </span>
-                      <span className="asems-role-option-copy mt-1.5 block text-xs leading-5 text-slate-600 sm:text-sm">
-                        {description}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+
+{accessRoles.map(({ title, role, description, icon: Icon }) => (
+  <button
+    key={title}
+    type="button"
+    onClick={() => chooseRole({ title, role })}
+    className="asems-role-option group flex min-h-[118px] items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:p-5"
+  >
+    <span className="asems-role-option-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition group-hover:bg-emerald-200">
+      <Icon size={24} aria-hidden="true" />
+    </span>
+
+    <span className="min-w-0">
+      <span className="asems-role-option-title block text-sm font-bold text-slate-900 sm:text-base">
+        {title}
+      </span>
+
+      <span className="asems-role-option-copy mt-1.5 block text-xs leading-5 text-slate-600 sm:text-sm">
+        {description}
+      </span>
+    </span>
+  </button>
+))}
+
+
+
+
+                
               </div>
             </div>
 

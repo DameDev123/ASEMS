@@ -181,10 +181,15 @@ export default function ImportPage({ user }) {
   );
   const validated = Boolean(report) && validatedKey === requestKey;
 
-  if (user?.role !== 'admin') {
-    return <Restricted>Only the system administrator can import students and instructors.</Restricted>;
-  }
+  const canImportUsers = ['admin', 'super_admin'].includes(user?.role);
 
+if (!canImportUsers) {
+  return (
+    <Restricted>
+      Only the Super Admin can import students and instructors.
+    </Restricted>
+  );
+}
   function resetAll(nextKind = kind) {
     setKind(nextKind);
     setFileInfo(null); setReport(null); setValidatedKey(''); setResult(null); setError('');

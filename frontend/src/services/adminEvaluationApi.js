@@ -68,6 +68,10 @@ export const adminEvaluationApi = {
       }),
     ),
 
+  // Administrative employees and supervisors available for assignment.
+  candidates: () =>
+    data(apiRequest(`${root}/candidates`)),
+
   // ============================================
   // ADMINISTRATOR EVALUATION LIST
   // ============================================
@@ -102,6 +106,53 @@ export const adminEvaluationApi = {
         method: 'PUT',
         body: JSON.stringify({ selfScore }),
       }),
+    ),
+
+  // The employee submits the self-assessment once; it is then locked.
+  submitSelf: (id, selfScore) =>
+    data(
+      apiRequest(`${root}/${id}/self/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ selfScore }),
+      }),
+    ),
+
+  // ============================================
+  // TEAM ASSESSMENT (each team member fills only their own)
+  // ============================================
+
+  // Administrator: replace the list of team assessors.
+  setTeam: (id, evaluatorUserIds) =>
+    data(
+      apiRequest(`${root}/${id}/team`, {
+        method: 'PUT',
+        body: JSON.stringify({ evaluatorUserIds }),
+      }),
+    ),
+
+  saveTeamAssessment: (id, body) =>
+    data(
+      apiRequest(`${root}/${id}/team-assessment`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    ),
+
+  submitTeamAssessment: (id, body) =>
+    data(
+      apiRequest(`${root}/${id}/team-assessment/submit`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    ),
+
+  // ============================================
+  // REPORTS (administrator)
+  // ============================================
+
+  report: (periodId) =>
+    data(
+      apiRequest(`${root}/reports/summary?periodId=${encodeURIComponent(periodId)}`),
     ),
 
   // ============================================

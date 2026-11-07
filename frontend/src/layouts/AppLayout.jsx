@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import NotificationBell from '../components/NotificationBell.jsx';
@@ -95,6 +94,11 @@ const adminGroups = [
         to: '/admin-assignments',
         icon: Users,
       },
+      {
+        label: 'Reports',
+        to: '/admin-evaluation-reports',
+        icon: FileText,
+      },
     ],
   },
 ];
@@ -114,29 +118,6 @@ const evaluationGroups = [
     label: 'MY WORK',
     items: [
       { label: 'My evaluations', to: '/my-evaluations', icon: FileText },
-    ],
-  },
-];
-
-/* =========================================================
-   ADMINISTRATIVE STAFF NAVIGATION
-========================================================= */
-
-const administrativeStaffGroups = [
-  {
-    label: 'OVERVIEW',
-    items: [
-      { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: 'MY WORK',
-    items: [
-      {
-        label: 'My administrative evaluations',
-        to: '/my-admin-evaluations',
-        icon: ClipboardCheck,
-      },
     ],
   },
 ];
@@ -336,17 +317,93 @@ function withoutMyEvaluations(groups) {
    ROLE-BASED NAVIGATION
 ========================================================= */
 
-function getNavigationGroups(role) {
+function getBaseNavigationGroups(role) {
   switch (role) {
+    // Full system administration
+    case 'super_admin':
     case 'admin':
       return adminGroups;
 
+    // Academic evaluation administration
+    case 'academic_admin':
+      return [
+        {
+          label: 'OVERVIEW',
+          items: [
+            { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+          ],
+        },
+        {
+          label: 'ACADEMIC ORGANIZATION',
+          items: [
+            { label: 'Departments', to: '/departments', icon: Building2 },
+            { label: 'Academic units', to: '/academic-units', icon: GraduationCap },
+            { label: 'Courses & instructors', to: '/academic', icon: BookOpen },
+          ],
+        },
+        {
+          label: 'ACADEMIC EVALUATIONS',
+          items: [
+            { label: 'Evaluation cycles', to: '/cycles', icon: CalendarDays },
+            { label: 'Official forms', to: '/forms', icon: ClipboardList },
+            { label: 'Evaluation tasks', to: '/tasks', icon: ClipboardCheck },
+          ],
+        },
+        {
+          label: 'WORKFLOW',
+          items: [
+            { label: 'Leadership evaluations', to: '/leadership', icon: UserCheck },
+            { label: 'Performance improvement', to: '/improvement', icon: Share2 },
+          ],
+        },
+        {
+          label: 'REPORTING',
+          items: [
+            { label: 'Reports & workflow', to: '/reports', icon: ChartNoAxesCombined },
+            { label: 'Final Evaluation Report', to: '/final-report', icon: FileText },
+            { label: 'Audit trail', to: '/audit', icon: ShieldCheck },
+          ],
+        },
+      ];
+
+    // Administrative staff evaluation administration
+    case 'administrative_admin':
+      return [
+        {
+          label: 'OVERVIEW',
+          items: [
+            { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+          ],
+        },
+        {
+          label: 'ADMINISTRATIVE STAFF EVALUATION',
+          items: [
+            {
+              label: 'Administrative evaluations',
+              to: '/admin-evaluations',
+              icon: FileText,
+            },
+            {
+              label: 'Evaluation periods',
+              to: '/admin-evaluation-periods',
+              icon: CalendarDays,
+            },
+            {
+              label: 'Performance levels',
+              to: '/admin-performance-levels',
+              icon: ClipboardList,
+            },
+            {
+              label: 'Employee assignments',
+              to: '/admin-assignments',
+              icon: Users,
+            },
+          ],
+        },
+      ];
+
     case 'teacher':
       return instructorGroups;
-
-    case 'administrative_staff':
-    case 'administrative':
-      return administrativeStaffGroups;
 
     case 'dean':
       return [
@@ -385,6 +442,49 @@ function getNavigationGroups(role) {
     default:
       return evaluationGroups;
   }
+}
+
+
+
+
+
+/* =========================================================
+   ADMINISTRATIVE STAFF EVALUATION - EMPLOYEE / SUPERVISOR ACCESS
+   Administrative employees and their supervisors sign in with their
+   existing roles (dean, management, concerned_office, department_head...).
+   Access to an individual evaluation is decided by the assignment on the
+   server, so every non-student, non-administrator role gets this link.
+   It shows an empty state when the person has no assignment.
+========================================================= */
+
+const ADMIN_EVALUATION_WORKSPACE_ROLES = new Set([
+  'teacher',
+  'department_head',
+  'dean',
+  'committee',
+  'management',
+  'academic_vp',
+  'archives',
+  'concerned_office',
+]);
+
+const myAdminEvaluationsGroup = {
+  label: 'ADMINISTRATIVE EVALUATION',
+  items: [
+    {
+      label: 'My administrative evaluations',
+      to: '/my-admin-evaluations',
+      icon: ClipboardCheck,
+    },
+  ],
+};
+
+function getNavigationGroups(role) {
+  const groups = getBaseNavigationGroups(role);
+
+  return ADMIN_EVALUATION_WORKSPACE_ROLES.has(role)
+    ? [...groups, myAdminEvaluationsGroup]
+    : groups;
 }
 
 /* =========================================================

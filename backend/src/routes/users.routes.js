@@ -1,7 +1,7 @@
-
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/authorize.js';
+
 import {
   listUsers,
   createUser,
@@ -11,8 +11,12 @@ import {
 
 const router = Router();
 
-// Every endpoint in this router requires an authenticated administrator.
-router.use(authenticate, authorize('admin'));
+// Super Admin manages system accounts.
+// Legacy admin remains temporarily supported.
+router.use(
+  authenticate,
+  authorize('super_admin', 'admin'),
+);
 
 router.get('/', async (req, res, next) => {
   try {
@@ -25,11 +29,15 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const user = await createUser(req.body, req);
+    const { user, initialPassword } = await createUser(req.body, req);
+
+    // The generated password is shown to the administrator exactly once. Make sure
+    // no browser, proxy or cache keeps a copy of this response.
+    res.set('Cache-Control', 'no-store');
     res.status(201).json({
       success: true,
       message: 'User created successfully.',
-      data: { user },
+      data: { user, initialPassword },
     });
   } catch (error) {
     next(error);
@@ -39,6 +47,7 @@ router.post('/', async (req, res, next) => {
 router.patch('/:id', async (req, res, next) => {
   try {
     const user = await updateUser(req.params.id, req.body, req);
+
     res.json({
       success: true,
       message: 'User updated successfully.',

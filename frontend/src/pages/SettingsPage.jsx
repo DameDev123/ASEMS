@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Eye, EyeOff, ImagePlus, KeyRound, Save } from 'lucide-react';
 import { apiRequest, getAssetUrl } from '../services/api.js';
 import {
+  PASSWORD_HINT,
+  PASSWORD_LENGTH_MESSAGE,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from '../utils/passwordPolicy.js';
+import {
   ErrorBanner,
   LoadingBlock,
   SuccessBanner,
@@ -199,8 +205,8 @@ function PasswordCard() {
     setError('');
     setNotice('');
 
-    if (newPassword.length < 12) {
-      setError('The new password must be at least 12 characters long.');
+    if (newPassword.length < PASSWORD_MIN_LENGTH || newPassword.length > PASSWORD_MAX_LENGTH) {
+      setError(PASSWORD_LENGTH_MESSAGE);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -237,7 +243,7 @@ function PasswordCard() {
         </span>
         <div>
           <h2 className="text-base font-semibold text-slate-900">Change password</h2>
-          <p className="text-xs text-slate-500">Use at least 12 characters.</p>
+          <p className="text-xs text-slate-500">{PASSWORD_HINT}</p>
         </div>
       </div>
 
@@ -263,14 +269,14 @@ function PasswordCard() {
         <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
           <label className="relative block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">
-              New password (minimum 12 characters)
+              New password (minimum {PASSWORD_MIN_LENGTH} characters)
             </span>
             <input
               type={showNew ? 'text' : 'password'}
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               autoComplete="new-password"
-              minLength={12}
+              minLength={PASSWORD_MIN_LENGTH}
               maxLength={128}
               required
               className={`${INPUT} pr-11`}
@@ -287,7 +293,7 @@ function PasswordCard() {
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               autoComplete="new-password"
-              minLength={12}
+              minLength={PASSWORD_MIN_LENGTH}
               maxLength={128}
               required
               className={`${INPUT} pr-11`}

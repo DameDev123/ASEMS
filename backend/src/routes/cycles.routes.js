@@ -115,7 +115,7 @@ router.get(
 // POST /api/cycles  (always created as "upcoming")
 router.post(
   '/',
-  allowRoles('admin'),
+  allowRoles('admin', 'super_admin'),
   asyncHandler(async (req, res) => {
     const parsed = cycleSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw validationError(parsed.error);
@@ -155,7 +155,7 @@ router.post(
 // PUT /api/cycles/:id  (edit details; not allowed once closed)
 router.put(
   '/:id',
-  allowRoles('admin'),
+  allowRoles('admin', 'super_admin'),
   asyncHandler(async (req, res) => {
     const id = cycleId(req);
     const parsed = cycleSchema.safeParse(req.body ?? {});
@@ -218,7 +218,7 @@ router.put(
 // PATCH /api/cycles/:id/status  body: { status: 'active' | 'closed' }
 router.patch(
   '/:id/status',
-  allowRoles('admin'),
+  allowRoles('admin', 'super_admin'),
   asyncHandler(async (req, res) => {
     const id = cycleId(req);
     const status = req.body?.status;
@@ -288,7 +288,7 @@ router.patch(
 // DELETE /api/cycles/:id  (only an upcoming cycle with no assignments)
 router.delete(
   '/:id',
-  allowRoles('admin'),
+  allowRoles('admin', 'super_admin'),
   asyncHandler(async (req, res) => {
     const id = cycleId(req);
 

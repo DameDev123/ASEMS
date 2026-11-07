@@ -201,7 +201,7 @@ export async function importStudents(body, req) {
 
   const credentials = await hashAll(
     toCreate,
-    () => generateInitialPassword(8),
+    () => generateInitialPassword(),
     STUDENT_BCRYPT_COST,
   );
 
@@ -399,7 +399,7 @@ export async function importInstructors(body, req) {
 
   const credentials = await hashAll(
     toCreate,
-    () => generateInitialPassword(12),
+    () => generateInitialPassword(),
     INSTRUCTOR_BCRYPT_COST,
   );
 

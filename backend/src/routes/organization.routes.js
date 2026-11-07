@@ -9,7 +9,7 @@ import * as studentAcademic from '../services/studentAcademicService.js';
 // academic units, departments, department staff and student groups.
 const router = Router();
 
-router.use(requireAuth, allowRoles('admin'));
+router.use(requireAuth, allowRoles('admin', 'super_admin'));
 
 /* Academic units */
 
