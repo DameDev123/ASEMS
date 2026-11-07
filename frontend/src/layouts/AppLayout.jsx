@@ -586,9 +586,9 @@ export default function AppLayout({ user, onLogout }) {
               }`
             }
           >
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+            { <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">
               Settings
-            </span>
+            </span> }
             <Settings size={15} aria-hidden="true" className="shrink-0" />
           </NavLink>
         </nav>

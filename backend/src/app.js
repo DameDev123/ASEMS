@@ -36,6 +36,9 @@ import translationRoutes from './routes/translation.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import adminEvaluationsRoutes from './routes/adminEvaluations.routes.js';
 
+// FIX: Import users routes
+import usersRoutes from './routes/users.routes.js';
+
 const app = express();
 
 const backendDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -113,6 +116,9 @@ app.use('/api/courses', coursesRoutes);
 app.use('/api/translation', translationRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/admin-evaluations', adminEvaluationsRoutes);
+
+// FIX: Register users API endpoint
+app.use('/api/users', usersRoutes);
 
 // Error handling
 app.use(notFoundHandler);
