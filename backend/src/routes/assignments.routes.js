@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import { pool } from '../config/database.js';
 import { requireAuth } from '../middlewares/auth.js';
@@ -7,67 +8,161 @@ const router = Router();
 router.use(requireAuth);
 
 const assignmentSelect = `
-  SELECT a.id, a.cycle_id, cy.title AS cycle_title,
-         COALESCE(NULLIF(TRIM(a.academic_year), ''), cy.academic_year) AS academic_year,
-         cy.status AS cycle_status,
-         a.form_id, a.form_version_id, f.code AS form_code, f.title AS form_title, f.evaluator_type, f.weight,
-         a.instructor_id, COALESCE(NULLIF(TRIM(a.instructor_name), ''), instructor.name) AS instructor_name,
-         COALESCE(NULLIF(TRIM(a.department_name), ''),
-           (SELECT d.name FROM employees ie JOIN departments d ON d.id = ie.department_id
-              WHERE ie.user_id = a.instructor_id LIMIT 1)) AS department_name,
-         a.college_name, a.section, a.evaluation_date,
-         a.evaluator_id, evaluator.name AS evaluator_name,
-         a.course_title, a.course_code, a.batch, a.semester, a.status,
-         e.id AS evaluation_id, e.status AS evaluation_status, e.submitted_at,
-         e.comment_strengths, e.comment_improvements
-    FROM evaluation_assignments a
-    JOIN evaluation_cycles cy ON cy.id = a.cycle_id
-    JOIN evaluation_forms f ON f.id = a.form_id
-    JOIN users instructor ON instructor.id = a.instructor_id
-    JOIN users evaluator ON evaluator.id = a.evaluator_id
-    LEFT JOIN evaluations e ON e.assignment_id = a.id`;
+  SELECT
+    a.id,
+    a.cycle_id,
+    cy.title AS cycle_title,
 
-// Administrators run the evaluation process but are not evaluators: they never read the answers or
-// comments of an evaluation. They may list assignments (who evaluates whom, and the status) without comments.
+    COALESCE(
+      NULLIF(TRIM((
+        SELECT ci.academic_year
+        FROM course_instructors ci
+        JOIN courses c ON c.id = ci.course_id
+        WHERE ci.instructor_id = a.instructor_id
+          AND c.course_code = a.course_code
+        ORDER BY ci.id DESC
+        LIMIT 1
+      )), ''),
+      cy.academic_year
+    ) AS academic_year,
+
+    cy.status AS cycle_status,
+
+    a.form_id,
+    a.form_version_id,
+    f.code AS form_code,
+    f.title AS form_title,
+    f.evaluator_type,
+    f.weight,
+
+    a.instructor_id,
+    instructor.name AS instructor_name,
+
+    (
+      SELECT d.name
+      FROM employees ie
+      JOIN departments d ON d.id = ie.department_id
+      WHERE ie.user_id = a.instructor_id
+      LIMIT 1
+    ) AS department_name,
+
+    (
+      SELECT fac.name
+      FROM employees ie
+      JOIN departments d ON d.id = ie.department_id
+      JOIN faculties fac ON fac.id = d.faculty_id
+      WHERE ie.user_id = a.instructor_id
+      LIMIT 1
+    ) AS college_name,
+
+    a.section,
+    a.evaluation_date,
+
+    a.evaluator_id,
+    evaluator.name AS evaluator_name,
+
+    a.course_title,
+    a.course_code,
+    a.batch,
+    a.semester,
+    a.status,
+
+    e.id AS evaluation_id,
+    e.status AS evaluation_status,
+    e.submitted_at,
+    e.comment_strengths,
+    e.comment_improvements
+
+  FROM evaluation_assignments a
+  JOIN evaluation_cycles cy ON cy.id = a.cycle_id
+  JOIN evaluation_forms f ON f.id = a.form_id
+  JOIN users instructor ON instructor.id = a.instructor_id
+  JOIN users evaluator ON evaluator.id = a.evaluator_id
+  LEFT JOIN evaluations e ON e.assignment_id = a.id
+`;
+
+// Administrators can see assignment information but cannot read
+// evaluation answers or comments.
 router.get('/', asyncHandler(async (req, res) => {
   const values = [];
   let where = '';
+
   if (req.user.role !== 'admin') {
     where = ' WHERE a.evaluator_id = ?';
     values.push(Number(req.user.id));
   }
-  const [rows] = await pool.execute(`${assignmentSelect}${where} ORDER BY a.created_at DESC`, values);
+
+  const [rows] = await pool.execute(
+    `${assignmentSelect}${where} ORDER BY a.created_at DESC`,
+    values
+  );
+
   sendData(
     res,
     req.user.role === 'admin'
       ? rows.map(({ comment_strengths: _s, comment_improvements: _i, ...rest }) => rest)
-      : rows,
+      : rows
   );
 }));
 
+// Get one assignment. Only its assigned evaluator can open it.
 router.get('/:id', asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, 'Invalid assignment ID.', 'VALIDATION_ERROR');
-  if (req.user.role === 'admin') {
-    throw httpError(403, 'Administrators cannot open the answers of an evaluation.', 'ADMIN_CANNOT_VIEW_EVALUATION');
+
+  if (!Number.isSafeInteger(id) || id < 1) {
+    throw httpError(
+      400,
+      'Invalid assignment ID.',
+      'VALIDATION_ERROR'
+    );
   }
+
+  if (req.user.role === 'admin') {
+    throw httpError(
+      403,
+      'Administrators cannot open the answers of an evaluation.',
+      'ADMIN_CANNOT_VIEW_EVALUATION'
+    );
+  }
+
   const [rows] = await pool.execute(
-    `${assignmentSelect} WHERE a.id = ? AND a.evaluator_id = ? LIMIT 1`,
-    [id, Number(req.user.id)],
+    `${assignmentSelect}
+     WHERE a.id = ?
+       AND a.evaluator_id = ?
+     LIMIT 1`,
+    [id, Number(req.user.id)]
   );
+
   const assignment = rows[0];
-  if (!assignment) throw httpError(404, 'Assignment not found.', 'NOT_FOUND');
+
+  if (!assignment) {
+    throw httpError(
+      404,
+      'Assignment not found.',
+      'NOT_FOUND'
+    );
+  }
 
   let scores = [];
+
   if (assignment.evaluation_id) {
     const [scoreRows] = await pool.execute(
-      `SELECT es.criterion_id, es.score, es.is_na
-         FROM evaluation_scores es WHERE es.evaluation_id = ?`,
+      `SELECT
+         es.criterion_id,
+         es.score,
+         es.is_na
+       FROM evaluation_scores es
+       WHERE es.evaluation_id = ?`,
       [assignment.evaluation_id]
     );
+
     scores = scoreRows;
   }
-  sendData(res, { ...assignment, scores });
+
+  sendData(res, {
+    ...assignment,
+    scores
+  });
 }));
 
 export default router;
