@@ -8,7 +8,10 @@ import { writeAudit } from '../utils/audit.js';
 const router = Router();
 router.use(requireAuth);
 
-const READ_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management'];
+// Administrators (legacy admin + super_admin) manage cycles: create, edit, activate, close, delete.
+const MANAGE_ROLES = ['admin', 'super_admin'];
+// Everyone who may view the cycle list. Non-administrators stay read-only.
+const READ_ROLES = [...MANAGE_ROLES, 'committee', 'department_head', 'dean', 'management'];
 const STATUSES = ['upcoming', 'active', 'closed'];
 
 // Forward-only lifecycle. A closed cycle can never be reopened.
@@ -115,7 +118,7 @@ router.get(
 // POST /api/cycles  (always created as "upcoming")
 router.post(
   '/',
-  allowRoles('admin', 'super_admin'),
+  allowRoles(...MANAGE_ROLES),
   asyncHandler(async (req, res) => {
     const parsed = cycleSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw validationError(parsed.error);
@@ -155,7 +158,7 @@ router.post(
 // PUT /api/cycles/:id  (edit details; not allowed once closed)
 router.put(
   '/:id',
-  allowRoles('admin', 'super_admin'),
+  allowRoles(...MANAGE_ROLES),
   asyncHandler(async (req, res) => {
     const id = cycleId(req);
     const parsed = cycleSchema.safeParse(req.body ?? {});
@@ -218,7 +221,7 @@ router.put(
 // PATCH /api/cycles/:id/status  body: { status: 'active' | 'closed' }
 router.patch(
   '/:id/status',
-  allowRoles('admin', 'super_admin'),
+  allowRoles(...MANAGE_ROLES),
   asyncHandler(async (req, res) => {
     const id = cycleId(req);
     const status = req.body?.status;
@@ -288,7 +291,7 @@ router.patch(
 // DELETE /api/cycles/:id  (only an upcoming cycle with no assignments)
 router.delete(
   '/:id',
-  allowRoles('admin', 'super_admin'),
+  allowRoles(...MANAGE_ROLES),
   asyncHandler(async (req, res) => {
     const id = cycleId(req);
 

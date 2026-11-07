@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../services/api.js';
 
-const VIEW_ROLES = ['admin', 'committee', 'department_head', 'dean', 'management'];
+// Keep in sync with backend/src/routes/cycles.routes.js (MANAGE_ROLES / READ_ROLES).
+const MANAGE_ROLES = ['admin', 'super_admin'];
+const VIEW_ROLES = [...MANAGE_ROLES, 'committee', 'department_head', 'dean', 'management'];
 
 const EMPTY_FORM = { title: '', academicYear: '', startDate: '', endDate: '' };
 
@@ -62,7 +64,7 @@ function describeDeadline(cycle) {
 }
 
 export default function CyclesPage({ user }) {
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = MANAGE_ROLES.includes(user?.role);
   const allowed = VIEW_ROLES.includes(user?.role);
 
   const [cycles, setCycles] = useState([]);
