@@ -1,4 +1,4 @@
-// Read-only safety check for the Administrative Staff Evaluation (ASE) work.
+// Read-only safety check for the Administrative staff (ASE) work.
 //
 // It records a fingerprint of every table that is NOT part of the new module and later proves
 // that none of them changed. It never writes to the database (only SELECT, SHOW and CHECKSUM TABLE).

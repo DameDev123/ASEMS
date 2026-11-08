@@ -26,7 +26,7 @@ import {
 
 const router = Router();
 
-// Administrator roles allowed to manage administrative staff evaluations.
+// Administrator roles allowed to manage Administrative staffs.
 // "admin" is retained for existing accounts until they are migrated.
 const ADMIN_EVALUATION_ADMINS = [
   'admin',

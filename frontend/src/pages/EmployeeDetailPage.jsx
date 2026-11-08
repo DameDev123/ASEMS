@@ -445,7 +445,7 @@ export default function EmployeeDetailPage() {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
             <p className="text-sm font-medium text-blue-700">
-              Administrative Staff Evaluation
+              Administrative staff
             </p>
 
             <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">

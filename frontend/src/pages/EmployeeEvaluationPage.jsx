@@ -101,7 +101,7 @@ function PageHeader({ user, onRefresh, refreshing }) {
           <span className="rounded-lg bg-blue-50 p-2">
             <ShieldCheck size={17} />
           </span>
-          Administrative Staff Evaluation
+          Administrative staff
         </div>
 
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">

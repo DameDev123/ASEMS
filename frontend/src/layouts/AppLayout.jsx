@@ -72,7 +72,7 @@ const adminGroups = [
     ],
   },
   {
-    label: 'ADMINISTRATIVE STAFF EVALUATION',
+    label: 'Administrative staff',
     items: [
       {
         label: 'Administrative evaluations',
@@ -366,7 +366,7 @@ function getBaseNavigationGroups(role) {
         },
       ];
 
-    // Administrative staff evaluation administration
+    // Administrative staff administration
     case 'administrative_admin':
       return [
         {
@@ -376,7 +376,7 @@ function getBaseNavigationGroups(role) {
           ],
         },
         {
-          label: 'ADMINISTRATIVE STAFF EVALUATION',
+          label: 'Administrative staff',
           items: [
             {
               label: 'Administrative evaluations',
@@ -449,7 +449,7 @@ function getBaseNavigationGroups(role) {
 
 
 /* =========================================================
-   ADMINISTRATIVE STAFF EVALUATION - EMPLOYEE / SUPERVISOR ACCESS
+   Administrative staff - EMPLOYEE / SUPERVISOR ACCESS
    Administrative employees and their supervisors sign in with their
    existing roles (dean, management, concerned_office, department_head...).
    Access to an individual evaluation is decided by the assignment on the

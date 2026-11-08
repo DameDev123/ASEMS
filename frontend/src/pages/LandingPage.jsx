@@ -128,7 +128,7 @@ const accessRoles = [
     title: 'Administrative Admin',
     role: 'administrative_admin',
     description:
-      'Manage administrative staff evaluation cycles, assignments, evaluation forms, and administrative reports.',
+      'Manage Administrative staff cycles, assignments, evaluation forms, and administrative reports.',
     icon: BriefcaseBusiness,
   },
   {

@@ -21,7 +21,7 @@ import { adminEvaluationApi as api } from '../services/adminEvaluationApi.js';
 import { confirmAction } from '../utils/confirmAction.js';
 import { downloadText, toCsv } from '../services/tableImport.js';
 
-// Roles allowed to manage administrative staff evaluations.
+// Roles allowed to manage Administrative staffs.
 // Must match ADMIN_EVALUATION_ADMINS in adminEvaluations.routes.js.
 const ADMIN_EVALUATION_ADMINS = ['admin', 'super_admin', 'administrative_admin'];
 const canManageAdminEvaluations = (user) =>
@@ -103,7 +103,7 @@ function Status({ value }) {
 }
 
 function PageHead({
-  eyebrow = 'Administrative staff evaluation',
+  eyebrow = 'Administrative staff',
   title,
   description,
   actions,
