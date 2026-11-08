@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
 import { authenticate } from '../middlewares/auth.js';
+import { denyPasswordChange } from '../utils/PasswordChangeDenied.js';
 import {
-  changePassword,
   getCurrentUser,
   loginUser,
   updateProfile,
@@ -118,19 +117,6 @@ function parseProfilePhoto(req, res, next) {
   });
 }
 
-// Limits guessing of the current password from a stolen session.
-const passwordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Too many attempts. Please try again later.',
-    code: 'RATE_LIMITED',
-  },
-});
-
 /**
  * POST /api/auth/login
  * Public: validates credentials and returns a JWT.
@@ -211,21 +197,10 @@ router.post('/profile-photo', authenticate, parseProfilePhoto, async (req, res, 
 });
 
 /**
- * POST /api/auth/change-password
- * Protected: the user changes their own password.
+ * ANY /api/auth/change-password
+ * Disabled for every account. Passwords are changed only by an administrator through
+ * User management (POST /api/users/:id/reset-password). Always answers 403.
  */
-router.post('/change-password', authenticate, passwordLimiter, async (req, res, next) => {
-  try {
-    const result = await changePassword(req.user.id, req.body, req.ip);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Password changed.',
-      data: result,
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+router.all('/change-password', denyPasswordChange);
 
 export default router;

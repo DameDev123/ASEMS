@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Eye, EyeOff, ImagePlus, KeyRound, Save } from 'lucide-react';
+import { ImagePlus, Save } from 'lucide-react';
 import { apiRequest, getAssetUrl } from '../services/api.js';
-import {
-  PASSWORD_HINT,
-  PASSWORD_LENGTH_MESSAGE,
-  PASSWORD_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-} from '../utils/passwordPolicy.js';
 import {
   ErrorBanner,
   LoadingBlock,
@@ -189,131 +183,6 @@ function ProfileCard() {
   );
 }
 
-function PasswordCard() {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-
-  async function submit(event) {
-    event.preventDefault();
-    setError('');
-    setNotice('');
-
-    if (newPassword.length < PASSWORD_MIN_LENGTH || newPassword.length > PASSWORD_MAX_LENGTH) {
-      setError(PASSWORD_LENGTH_MESSAGE);
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError('The new password and its confirmation do not match.');
-      return;
-    }
-    if (newPassword === currentPassword) {
-      setError('The new password must be different from the current password.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await apiRequest('/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setNotice('Password changed. Use the new password the next time you sign in.');
-    } catch (err) {
-      setError(err.message || 'Unable to change the password.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="panel-card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-          <KeyRound size={18} />
-        </span>
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Change password</h2>
-          <p className="text-xs text-slate-500">{PASSWORD_HINT}</p>
-        </div>
-      </div>
-
-      <form onSubmit={submit} className="space-y-4 p-5">
-        <ErrorBanner message={error} />
-        <SuccessBanner message={notice} />
-
-        <label className="relative block max-w-md">
-          <span className="mb-1.5 block text-xs font-semibold text-slate-600">Current password</span>
-          <input
-            type={showCurrent ? 'text' : 'password'}
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-            className={`${INPUT} pr-11`}
-          />
-          <button type="button" onClick={() => setShowCurrent((value) => !value)} aria-label={showCurrent ? 'Hide current password' : 'Show current password'} className="absolute right-3 mt-[-2rem] text-slate-500">
-            {showCurrent ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
-        </label>
-
-        <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
-          <label className="relative block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">
-              New password (minimum {PASSWORD_MIN_LENGTH} characters)
-            </span>
-            <input
-              type={showNew ? 'text' : 'password'}
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              autoComplete="new-password"
-              minLength={PASSWORD_MIN_LENGTH}
-              maxLength={128}
-              required
-              className={`${INPUT} pr-11`}
-            />
-            <button type="button" onClick={() => setShowNew((value) => !value)} aria-label={showNew ? 'Hide new password' : 'Show new password'} className="absolute right-3 mt-[-2rem] text-slate-500">
-              {showNew ? <EyeOff size={17} /> : <Eye size={17} />}
-            </button>
-          </label>
-
-          <label className="block relative">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Confirm new password</span>
-            <input
-              type={showConfirm ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              autoComplete="new-password"
-              minLength={PASSWORD_MIN_LENGTH}
-              maxLength={128}
-              required
-              className={`${INPUT} pr-11`}
-            />
-            <button type="button" onClick={() => setShowConfirm((value) => !value)} aria-label={showConfirm ? 'Hide confirmation password' : 'Show confirmation password'} className="absolute right-3 mt-[-2rem] text-slate-500">
-              {showConfirm ? <EyeOff size={17} /> : <Eye size={17} />}
-            </button>
-          </label>
-        </div>
-
-        <div className="flex max-w-3xl justify-end">
-          <button type="submit" disabled={saving} className="primary-button disabled:opacity-60">
-            <KeyRound size={15} /> {saving ? 'Changing…' : 'Change password'}
-          </button>
-        </div>
-      </form>
-    </section>
-  );
-}
-
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
@@ -321,12 +190,12 @@ export default function SettingsPage() {
         <p className="text-sm font-medium text-slate-500">Account</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Settings</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-500">
-          Update your contact details and change your password.
+          Update your contact details and profile picture. Passwords are managed by your
+          system administrator.
         </p>
       </div>
 
       <ProfileCard />
-      <PasswordCard />
     </div>
   );
 }

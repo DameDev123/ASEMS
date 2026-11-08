@@ -1,8 +1,13 @@
+
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { pool } from '../config/database.js';
 import { writeAudit } from '../utils/audit.js';
-import { generateInitialPassword } from '../utils/credentials.js';
+import {
+  generateInitialPassword,
+  generateTemporaryPassword,
+} from '../utils/credentials.js';
+import { passwordPolicyError } from '../utils/passwordPolicy.js';
 
 const ROLES = [
   'admin',
@@ -19,14 +24,14 @@ const ROLES = [
   'archives',
   'concerned_office',
 ];
+
 const STATUSES = ['active', 'inactive', 'suspended'];
 
 const BCRYPT_COST = 12;
 
 const EMPLOYEE_TYPES = ['academic', 'administrative'];
 
-// Account columns plus the staff record (if any). The LEFT JOIN keeps students and
-// other accounts without an employees row in the result.
+// Account columns plus the staff record (if any).
 const userSelect = `
   SELECT u.id, u.name, u.email, u.role, u.status, u.phone, u.gender,
          u.id_number, u.profile_photo,
@@ -44,8 +49,7 @@ const userSchema = z.object({
   gender: z.enum(['male', 'female']).nullable().optional(),
   id_number: z.string().trim().max(40).nullable().optional(),
   profile_photo: z.string().trim().max(255).nullable().optional(),
-  // Staff record. employeeType 'administrative' makes the person available in the
-  // Administrative Staff Evaluation assignments; leave empty for non-staff accounts.
+
   employeeType: z.enum(EMPLOYEE_TYPES).nullable().optional(),
   departmentId: z.number().int().positive().nullable().optional(),
   jobTitle: z.string().trim().max(150).nullable().optional(),
@@ -77,7 +81,7 @@ function publicUser(user) {
   };
 }
 
-// The form sends '' for empty staff fields and the department id as a string.
+// Normalize empty staff fields sent by the frontend.
 function normalizeStaffInput(input = {}) {
   const out = { ...input };
 
@@ -139,8 +143,7 @@ async function audit(connection, req, action, userId, details = {}) {
   });
 }
 
-// Creates or updates the staff (employees) record of an account. Fields left out of the
-// request keep their stored value. Passing no employeeType never deletes an existing record.
+// Creates or updates the employee record of an account.
 async function saveStaffRecord(connection, userId, role, data) {
   if (!data.employeeType) return null;
 
@@ -153,14 +156,19 @@ async function saveStaffRecord(connection, userId, role, data) {
   }
 
   const [existingRows] = await connection.execute(
-    'SELECT department_id, job_title FROM employees WHERE user_id = ? FOR UPDATE',
+    `SELECT department_id, job_title
+       FROM employees
+      WHERE user_id = ?
+      FOR UPDATE`,
     [userId],
   );
 
   const existing = existingRows[0];
+
   const departmentId = data.departmentId !== undefined
     ? data.departmentId
     : existing?.department_id ?? null;
+
   const jobTitle = data.jobTitle !== undefined
     ? data.jobTitle
     : existing?.job_title ?? null;
@@ -171,11 +179,14 @@ async function saveStaffRecord(connection, userId, role, data) {
       [departmentId],
     );
 
-    if (!departments[0]) fail('Department not found.', 404, 'DEPARTMENT_NOT_FOUND');
+    if (!departments[0]) {
+      fail('Department not found.', 404, 'DEPARTMENT_NOT_FOUND');
+    }
   }
 
   await connection.execute(
-    `INSERT INTO employees (user_id, department_id, employee_type, job_title)
+    `INSERT INTO employees
+       (user_id, department_id, employee_type, job_title)
      VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        department_id = VALUES(department_id),
@@ -184,15 +195,25 @@ async function saveStaffRecord(connection, userId, role, data) {
     [userId, departmentId, data.employeeType, jobTitle],
   );
 
-  return { employeeType: data.employeeType, departmentId, jobTitle };
+  return {
+    employeeType: data.employeeType,
+    departmentId,
+    jobTitle,
+  };
 }
+
+// ======================================================
+// LIST USERS
+// ======================================================
 
 export async function listUsers(query, req) {
   const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
+
   const limit = Math.min(
     100,
     Math.max(1, Number.parseInt(query.limit, 10) || 10),
   );
+
   const offset = (page - 1) * limit;
 
   if (!Number.isSafeInteger(offset)) {
@@ -203,14 +224,22 @@ export async function listUsers(query, req) {
   const role = query.role || '';
   const status = query.status || '';
 
-  if (role && !ROLES.includes(role)) fail('Invalid role filter.');
-  if (status && !STATUSES.includes(status)) fail('Invalid status filter.');
+  if (role && !ROLES.includes(role)) {
+    fail('Invalid role filter.');
+  }
+
+  if (status && !STATUSES.includes(status)) {
+    fail('Invalid status filter.');
+  }
 
   const conditions = [];
   const params = [];
 
   if (search) {
-    conditions.push('(u.name LIKE ? OR u.email LIKE ? OR u.id_number LIKE ?)');
+    conditions.push(
+      '(u.name LIKE ? OR u.email LIKE ? OR u.id_number LIKE ?)',
+    );
+
     const term = `%${search}%`;
     params.push(term, term, term);
   }
@@ -244,6 +273,7 @@ export async function listUsers(query, req) {
 
   return {
     users: rows.map(publicUser),
+
     pagination: {
       page,
       limit,
@@ -253,14 +283,21 @@ export async function listUsers(query, req) {
   };
 }
 
+// ======================================================
+// CREATE USER
+// ======================================================
+
 export async function createUser(input, req) {
   const data = nullableFields(parseUser(input));
 
-  // The administrator never supplies a password. It is generated here, on the server,
-  // returned once in the create response, and only its bcrypt hash is stored.
-  // 4-6 characters, see utils/credentials.js.
+  // Generate the initial password on the server.
   const initialPassword = generateInitialPassword();
-  const passwordHash = await bcrypt.hash(initialPassword, BCRYPT_COST);
+
+  const passwordHash = await bcrypt.hash(
+    initialPassword,
+    BCRYPT_COST,
+  );
+
   const connection = await pool.getConnection();
 
   try {
@@ -290,7 +327,7 @@ export async function createUser(input, req) {
       data,
     );
 
-    // Never write the password (or its hash) to the audit log.
+    // Never store passwords or password hashes in audit logs.
     await audit(connection, req, 'user.created', result.insertId, {
       role: data.role,
       employeeType: staff?.employeeType ?? null,
@@ -304,12 +341,19 @@ export async function createUser(input, req) {
 
     await connection.commit();
 
-    return { user: publicUser(rows[0]), initialPassword };
+    return {
+      user: publicUser(rows[0]),
+      initialPassword,
+    };
   } catch (error) {
     await connection.rollback();
 
     if (isDuplicateEmail(error)) {
-      fail('A user with this email or ID number already exists.', 409, 'DUPLICATE_USER');
+      fail(
+        'A user with this email or ID number already exists.',
+        409,
+        'DUPLICATE_USER',
+      );
     }
 
     throw error;
@@ -317,6 +361,10 @@ export async function createUser(input, req) {
     connection.release();
   }
 }
+
+// ======================================================
+// UPDATE USER
+// ======================================================
 
 export async function updateUser(id, input, req) {
   validateId(id);
@@ -328,42 +376,52 @@ export async function updateUser(id, input, req) {
     await connection.beginTransaction();
 
     const [existingRows] = await connection.execute(
-      `SELECT id, role, status FROM users WHERE id = ? FOR UPDATE`,
+      `SELECT id, role, status
+         FROM users
+        WHERE id = ?
+        FOR UPDATE`,
       [id],
     );
 
     const existing = existingRows[0];
-    if (!existing) fail('User not found.', 404, 'USER_NOT_FOUND');
 
+    if (!existing) {
+      fail('User not found.', 404, 'USER_NOT_FOUND');
+    }
+
+    // Prevent demoting the last active administrator.
     if (
-  ['admin', 'super_admin'].includes(existing.role) &&
-  existing.status === 'active' &&
-  data.role !== existing.role
-) {
-  const [admins] = await connection.execute(
-    `SELECT id
-       FROM users
-      WHERE role = ?
-        AND status = 'active'
-      FOR UPDATE`,
-    [existing.role],
-  );
+      ['admin', 'super_admin'].includes(existing.role) &&
+      existing.status === 'active' &&
+      data.role !== existing.role
+    ) {
+      const [admins] = await connection.execute(
+        `SELECT id
+           FROM users
+          WHERE role = ?
+            AND status = 'active'
+          FOR UPDATE`,
+        [existing.role],
+      );
 
-  if (admins.length <= 1) {
-    fail(
-      `Cannot demote the last active ${existing.role.replaceAll('_', ' ')}.`,
-      409,
-      'LAST_ADMIN',
-    );
-  }
-}
-
-
+      if (admins.length <= 1) {
+        fail(
+          `Cannot demote the last active ${existing.role.replaceAll('_', ' ')}.`,
+          409,
+          'LAST_ADMIN',
+        );
+      }
+    }
 
     await connection.execute(
       `UPDATE users
-          SET name = ?, email = ?, role = ?, phone = ?, gender = ?,
-              id_number = ?, profile_photo = ?
+          SET name = ?,
+              email = ?,
+              role = ?,
+              phone = ?,
+              gender = ?,
+              id_number = ?,
+              profile_photo = ?
         WHERE id = ?`,
       [
         data.name,
@@ -377,7 +435,12 @@ export async function updateUser(id, input, req) {
       ],
     );
 
-    const staff = await saveStaffRecord(connection, id, data.role, data);
+    const staff = await saveStaffRecord(
+      connection,
+      id,
+      data.role,
+      data,
+    );
 
     await audit(connection, req, 'user.updated', id, {
       previousRole: existing.role,
@@ -397,7 +460,11 @@ export async function updateUser(id, input, req) {
     await connection.rollback();
 
     if (isDuplicateEmail(error)) {
-      fail('A user with this email or ID number already exists.', 409, 'DUPLICATE_USER');
+      fail(
+        'A user with this email or ID number already exists.',
+        409,
+        'DUPLICATE_USER',
+      );
     }
 
     throw error;
@@ -406,10 +473,16 @@ export async function updateUser(id, input, req) {
   }
 }
 
+// ======================================================
+// CHANGE USER STATUS
+// ======================================================
+
 export async function changeUserStatus(id, status, req) {
   validateId(id);
 
-  if (!STATUSES.includes(status)) fail('Invalid account status.');
+  if (!STATUSES.includes(status)) {
+    fail('Invalid account status.');
+  }
 
   const connection = await pool.getConnection();
 
@@ -417,39 +490,53 @@ export async function changeUserStatus(id, status, req) {
     await connection.beginTransaction();
 
     const [rows] = await connection.execute(
-      `SELECT id, role, status FROM users WHERE id = ? FOR UPDATE`,
+      `SELECT id, role, status
+         FROM users
+        WHERE id = ?
+        FOR UPDATE`,
       [id],
     );
 
     const user = rows[0];
-    if (!user) fail('User not found.', 404, 'USER_NOT_FOUND');
 
-    if (Number(user.id) === Number(req.user.id) && status !== 'active') {
-      fail('You cannot deactivate or suspend your own account.', 409, 'SELF_DEACTIVATION');
+    if (!user) {
+      fail('User not found.', 404, 'USER_NOT_FOUND');
     }
 
     if (
-  ['admin', 'super_admin'].includes(user.role) &&
-  user.status === 'active' &&
-  status !== 'active'
-) {
-  const [admins] = await connection.execute(
-    `SELECT id
-       FROM users
-      WHERE role = ?
-        AND status = 'active'
-      FOR UPDATE`,
-    [user.role],
-  );
+      Number(user.id) === Number(req.user.id) &&
+      status !== 'active'
+    ) {
+      fail(
+        'You cannot deactivate or suspend your own account.',
+        409,
+        'SELF_DEACTIVATION',
+      );
+    }
 
-  if (admins.length <= 1) {
-    fail(
-      `Cannot deactivate the last active ${user.role.replaceAll('_', ' ')}.`,
-      409,
-      'LAST_ADMIN',
-    );
-  }
-}
+    // Prevent deactivating the last active administrator.
+    if (
+      ['admin', 'super_admin'].includes(user.role) &&
+      user.status === 'active' &&
+      status !== 'active'
+    ) {
+      const [admins] = await connection.execute(
+        `SELECT id
+           FROM users
+          WHERE role = ?
+            AND status = 'active'
+          FOR UPDATE`,
+        [user.role],
+      );
+
+      if (admins.length <= 1) {
+        fail(
+          `Cannot deactivate the last active ${user.role.replaceAll('_', ' ')}.`,
+          409,
+          'LAST_ADMIN',
+        );
+      }
+    }
 
     await connection.execute(
       'UPDATE users SET status = ? WHERE id = ?',
@@ -463,7 +550,136 @@ export async function changeUserStatus(id, status, req) {
 
     await connection.commit();
 
-    return { id: user.id, status };
+    return {
+      id: user.id,
+      status,
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+// ======================================================
+// RESET USER PASSWORD
+// ======================================================
+
+export async function resetUserPassword(id, input = {}, req) {
+  validateId(id);
+
+  const requesterRole = req.user?.role;
+
+  // Only administrators can reset user passwords.
+  if (!['admin', 'super_admin'].includes(requesterRole)) {
+    fail(
+      'You are not authorized to reset passwords.',
+      403,
+      'FORBIDDEN',
+    );
+  }
+
+  const hasNewPassword =
+    typeof input.newPassword === 'string' &&
+    input.newPassword.length > 0;
+
+  let newPassword;
+  let passwordGenerated = false;
+
+  if (hasNewPassword) {
+    const policyError = passwordPolicyError(input.newPassword);
+
+    if (policyError) {
+      fail(
+        policyError,
+        400,
+        'INVALID_PASSWORD',
+      );
+    }
+
+    newPassword = input.newPassword;
+  } else {
+    // Generate a temporary password when no password is supplied.
+    newPassword = generateTemporaryPassword();
+    passwordGenerated = true;
+  }
+
+  // Hash the password before storing it.
+  const passwordHash = await bcrypt.hash(
+    newPassword,
+    BCRYPT_COST,
+  );
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.execute(
+      `SELECT id, name, role, status
+         FROM users
+        WHERE id = ?
+        FOR UPDATE`,
+      [id],
+    );
+
+    const target = rows[0];
+
+    if (!target) {
+      fail(
+        'User not found.',
+        404,
+        'USER_NOT_FOUND',
+      );
+    }
+
+    // A regular admin cannot reset a Super Admin password.
+    if (
+      requesterRole === 'admin' &&
+      target.role === 'super_admin'
+    ) {
+      fail(
+        'An administrator cannot reset a Super Admin password.',
+        403,
+        'SUPER_ADMIN_RESET_FORBIDDEN',
+      );
+    }
+
+    // Update the password and invalidate existing sessions.
+    await connection.execute(
+      `UPDATE users
+          SET password = ?,
+              tokens_valid_after = DATE_ADD(NOW(), INTERVAL 1 SECOND)
+        WHERE id = ?`,
+      [passwordHash, id],
+    );
+
+    // Never include the actual password or password hash in audit details.
+    await audit(
+      connection,
+      req,
+      'user.password_reset',
+      target.id,
+      {
+        passwordGenerated,
+        sessionsRevoked: true,
+      },
+    );
+
+    await connection.commit();
+
+    // Return a generated temporary password only once.
+    // A manually supplied password is never returned.
+    return {
+      id: target.id,
+      name: target.name,
+      passwordGenerated,
+
+      ...(passwordGenerated
+        ? { temporaryPassword: newPassword }
+        : {}),
+    };
   } catch (error) {
     await connection.rollback();
     throw error;

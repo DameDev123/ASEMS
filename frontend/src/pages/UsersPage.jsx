@@ -1,6 +1,7 @@
 import { confirmAction } from '../utils/confirmAction.js';
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../services/api.js';
+import { PASSWORD_MIN_LENGTH, passwordPolicyError } from '../utils/passwordPolicy.js';
 
 const ROLES = [
   'admin',
@@ -24,8 +25,11 @@ const EMPTY_FORM = {
   name: '',
   email: '',
   role: 'student',
+  password: '',
   phone: '',
   gender: '',
+  date_of_birth: '',
+  address: '',
   id_number: '',
   profile_photo: '',
   employeeType: '',
@@ -122,10 +126,17 @@ export default function UsersPage({ user }) {
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  // One-time display of the server-generated initial password after account creation.
-  const [createdCredentials, setCreatedCredentials] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [actionUserId, setActionUserId] = useState(null);
+
+  // Administrator password reset (the only way a password can change).
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetMode, setResetMode] = useState('generate');
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [issued, setIssued] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -186,6 +197,10 @@ export default function UsersPage({ user }) {
       role: account.role || 'student',
       phone: account.phone || '',
       gender: account.gender || '',
+      date_of_birth: account.dateOfBirth
+        ? String(account.dateOfBirth).slice(0, 10)
+        : '',
+      address: account.address || '',
       id_number: account.idNumber || '',
       profile_photo: account.profilePhoto || '',
       employeeType: account.employeeType || '',
@@ -214,6 +229,8 @@ export default function UsersPage({ user }) {
       role: form.role,
       phone: form.phone.trim() || null,
       gender: form.gender || null,
+      date_of_birth: form.date_of_birth || null,
+      address: form.address.trim() || null,
       id_number: form.id_number.trim() || null,
       profile_photo: form.profile_photo.trim() || null,
       // Staff record. "administrative" makes the person appear in the
@@ -232,19 +249,14 @@ export default function UsersPage({ user }) {
         });
         setNotice('User account updated successfully.');
       } else {
-        // No password is sent: the server generates the initial password and
-        // returns it once so it can be handed to the user.
-        const response = await apiRequest('/users', {
+        await apiRequest('/users', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            ...payload,
+            password: form.password,
+          }),
         });
         setNotice('User account created successfully.');
-        setCreatedCredentials({
-          name: response?.data?.user?.name || payload.name,
-          email: response?.data?.user?.email || payload.email,
-          initialPassword: response?.data?.initialPassword || '',
-        });
-        setCopied(false);
       }
 
       setDialogOpen(false);
@@ -282,6 +294,80 @@ export default function UsersPage({ user }) {
       setError(err.message || 'Unable to change account status.');
     } finally {
       setActionUserId(null);
+    }
+  }
+
+  // Only a super admin may reset a super admin (also enforced by the API).
+  const canReset = (account) =>
+    account.role !== 'super_admin' || user?.role === 'super_admin';
+
+  function openReset(account) {
+    setResetTarget(account);
+    setResetMode('generate');
+    setResetPassword('');
+    setResetConfirm('');
+    setResetError('');
+  }
+
+  function closeReset() {
+    setResetTarget(null);
+    setResetPassword('');
+    setResetConfirm('');
+    setResetError('');
+  }
+
+  async function submitReset(event) {
+    event.preventDefault();
+    setResetError('');
+
+    if (resetMode === 'custom') {
+      const problem = passwordPolicyError(resetPassword);
+
+      if (problem) {
+        setResetError(problem);
+        return;
+      }
+
+      if (resetPassword !== resetConfirm) {
+        setResetError('The password and its confirmation do not match.');
+        return;
+      }
+    }
+
+    const target = resetTarget;
+    setResetBusy(true);
+
+    try {
+      const result = await apiRequest(`/users/${target.id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify(resetMode === 'custom' ? { newPassword: resetPassword } : {}),
+      });
+
+      const data = result?.data || {};
+      closeReset();
+
+      if (data.passwordGenerated && data.temporaryPassword) {
+        setCopied(false);
+        setIssued({ name: target.name, email: target.email, password: data.temporaryPassword });
+      }
+
+      setNotice(
+        `Password reset for ${target.name}. Their existing sessions were ended.` +
+          (String(target.id) === String(user?.id) ? ' You will be asked to sign in again.' : ''),
+      );
+    } catch (err) {
+      setResetError(err.message || 'Unable to reset the password.');
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  async function copyIssuedPassword() {
+    try {
+      await navigator.clipboard.writeText(issued.password);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   }
 
@@ -505,6 +591,15 @@ export default function UsersPage({ user }) {
                         >
                           Edit
                         </button>
+                        {canReset(account) && (
+                          <button
+                            type="button"
+                            onClick={() => openReset(account)}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-white"
+                          >
+                            Reset password
+                          </button>
+                        )}
                         <button
                           type="button"
                           disabled={
@@ -591,7 +686,7 @@ export default function UsersPage({ user }) {
                 <p className="mt-1 text-sm text-slate-500">
                   {editingUser
                     ? 'Update the account details and assigned role.'
-                    : 'A secure initial password is generated automatically after the account is created.'}
+                    : 'Create an account with an initial password.'}
                 </p>
               </div>
               <button
@@ -702,6 +797,22 @@ export default function UsersPage({ user }) {
                   </>
                 )}
 
+                {!editingUser && (
+                  <Field label="Initial password (minimum 12 characters)">
+                    <input
+                      required
+                      type="password"
+                      minLength={12}
+                      maxLength={128}
+                      name="password"
+                      value={form.password}
+                      onChange={updateField}
+                      className={inputClass}
+                      autoComplete="new-password"
+                    />
+                  </Field>
+                )}
+
                 <Field label="Phone number">
                   <input
                     maxLength={20}
@@ -726,6 +837,16 @@ export default function UsersPage({ user }) {
                   </select>
                 </Field>
 
+                <Field label="Date of birth">
+                  <input
+                    type="date"
+                    name="date_of_birth"
+                    value={form.date_of_birth}
+                    onChange={updateField}
+                    className={inputClass}
+                  />
+                </Field>
+
                 <Field label="University ID number">
                   <input
                     maxLength={40}
@@ -735,6 +856,19 @@ export default function UsersPage({ user }) {
                     className={inputClass}
                   />
                 </Field>
+
+                <div className="sm:col-span-2">
+                  <Field label="Address">
+                    <input
+                      maxLength={255}
+                      name="address"
+                      value={form.address}
+                      onChange={updateField}
+                      className={inputClass}
+                      autoComplete="street-address"
+                    />
+                  </Field>
+                </div>
               </div>
 
               <div className="flex flex-col-reverse justify-end gap-3 border-t border-slate-100 pt-5 sm:flex-row">
@@ -762,71 +896,149 @@ export default function UsersPage({ user }) {
           </section>
         </div>
       )}
-
-      {createdCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
-          <section
+      {resetTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 sm:items-center"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !resetBusy) closeReset();
+          }}
+        >
+          <form
+            onSubmit={submitReset}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="credentials-dialog-title"
-            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+            aria-labelledby="reset-dialog-title"
+            className="my-6 w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-2xl"
           >
-            <div className="border-b border-slate-100 px-6 py-5">
-              <h2 id="credentials-dialog-title" className="text-lg font-bold text-slate-900">
-                Account created
+            <div>
+              <h2 id="reset-dialog-title" className="text-lg font-bold text-slate-900">
+                Reset password
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                {createdCredentials.name} ({createdCredentials.email})
+                {resetTarget.name} ({resetTarget.email}). Their current password stops working and
+                any signed-in session is ended.
               </p>
             </div>
 
-            <div className="space-y-4 p-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Initial password
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <code
-                    data-testid="initial-password"
-                    className="flex-1 select-all rounded-lg bg-slate-100 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-slate-900"
-                  >
-                    {createdCredentials.initialPassword}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(createdCredentials.initialPassword);
-                        setCopied(true);
-                      } catch {
-                        setCopied(false);
-                      }
-                    }}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
+            {resetError && (
+              <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {resetError}
               </div>
+            )}
 
-              <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                This password is shown only once and cannot be viewed again. Give it to the user
-                through a secure channel and ask them to change it after signing in
-                (Settings &rarr; Change password).
-              </p>
+            <div className="space-y-3 text-sm">
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="resetMode"
+                  checked={resetMode === 'generate'}
+                  onChange={() => setResetMode('generate')}
+                  className="mt-1"
+                />
+                <span>
+                  <strong>Generate a secure password</strong> (recommended)
+                  <span className="block text-xs text-slate-500">
+                    The server creates it and shows it once. Share it with the user securely.
+                  </span>
+                </span>
+              </label>
 
-              <div className="flex justify-end border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatedCredentials(null);
-                    setCopied(false);
-                  }}
-                  className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700"
-                >
-                  Done
-                </button>
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="resetMode"
+                  checked={resetMode === 'custom'}
+                  onChange={() => setResetMode('custom')}
+                  className="mt-1"
+                />
+                <span>
+                  <strong>Set a password myself</strong>
+                </span>
+              </label>
+            </div>
+
+            {resetMode === 'custom' && (
+              <div className="grid gap-4">
+                <Field label={`New password (minimum ${PASSWORD_MIN_LENGTH} characters)`}>
+                  <input
+                    type="password"
+                    value={resetPassword}
+                    onChange={(event) => setResetPassword(event.target.value)}
+                    className={inputClass}
+                    autoComplete="new-password"
+                    maxLength={128}
+                  />
+                </Field>
+                <Field label="Confirm new password">
+                  <input
+                    type="password"
+                    value={resetConfirm}
+                    onChange={(event) => setResetConfirm(event.target.value)}
+                    className={inputClass}
+                    autoComplete="new-password"
+                    maxLength={128}
+                  />
+                </Field>
               </div>
+            )}
+
+            <div className="flex flex-col-reverse justify-end gap-3 border-t border-slate-100 pt-5 sm:flex-row">
+              <button
+                type="button"
+                disabled={resetBusy}
+                onClick={closeReset}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={resetBusy}
+                className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+              >
+                {resetBusy ? 'Resetting…' : 'Reset password'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {issued && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 sm:items-center">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="issued-dialog-title"
+            className="my-6 w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h2 id="issued-dialog-title" className="text-lg font-bold text-slate-900">
+              New password for {issued.name}
+            </h2>
+            <p className="text-sm text-slate-600">
+              Account: <strong>{issued.email}</strong>
+            </p>
+            <p className="select-all break-all rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-lg tracking-wider text-slate-900">
+              {issued.password}
+            </p>
+            <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              This password is shown only once and is not stored in readable form. Copy it now and
+              give it to the user securely.
+            </p>
+            <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={copyIssuedPassword}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                {copied ? 'Copied' : 'Copy password'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIssued(null)}
+                className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700"
+              >
+                I have copied it
+              </button>
             </div>
           </section>
         </div>

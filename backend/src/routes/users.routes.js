@@ -7,6 +7,7 @@ import {
   createUser,
   updateUser,
   changeUserStatus,
+  resetUserPassword,
 } from '../services/users.service.js';
 
 const router = Router();
@@ -29,15 +30,12 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { user, initialPassword } = await createUser(req.body, req);
+    const user = await createUser(req.body, req);
 
-    // The generated password is shown to the administrator exactly once. Make sure
-    // no browser, proxy or cache keeps a copy of this response.
-    res.set('Cache-Control', 'no-store');
     res.status(201).json({
       success: true,
       message: 'User created successfully.',
-      data: { user, initialPassword },
+      data: { user },
     });
   } catch (error) {
     next(error);
@@ -70,6 +68,25 @@ router.patch('/:id/status', async (req, res, next) => {
       success: true,
       message: 'Account status updated successfully.',
       data: { user: result },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Administrator password reset - the only way a password can be changed.
+// Optional body { newPassword }. Without it the server generates a secure password and
+// returns it once.
+router.post('/:id/reset-password', async (req, res, next) => {
+  try {
+    const result = await resetUserPassword(req.params.id, req.body, req);
+
+    // The response may contain a temporary password: never cache it.
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      message: 'Password reset. Existing sessions for this account were ended.',
+      data: result,
     });
   } catch (error) {
     next(error);

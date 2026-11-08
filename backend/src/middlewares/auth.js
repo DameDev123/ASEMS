@@ -1,4 +1,3 @@
-
 import jwt from 'jsonwebtoken';
 
 import { env } from '../config/env.js';
@@ -53,7 +52,8 @@ export async function authenticate(req, res, next) {
 
   try {
     const [rows] = await pool.execute(
-      `SELECT id, name, email, role, status
+      `SELECT id, name, email, role, status,
+              UNIX_TIMESTAMP(tokens_valid_after) AS tokens_valid_after_ts
          FROM users
         WHERE id = ?
         LIMIT 1`,
@@ -67,6 +67,19 @@ export async function authenticate(req, res, next) {
         success: false,
         message: 'Your account is unavailable.',
         code: 'ACCOUNT_UNAVAILABLE',
+      });
+    }
+
+    // An administrator password reset ends every session issued before it.
+    if (
+      user.tokens_valid_after_ts !== null &&
+      user.tokens_valid_after_ts !== undefined &&
+      Number(payload.iat) < Math.floor(Number(user.tokens_valid_after_ts))
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Your session has ended because your account was changed. Please sign in again.',
+        code: 'SESSION_REVOKED',
       });
     }
 
