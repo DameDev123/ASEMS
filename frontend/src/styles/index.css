@@ -237,3 +237,119 @@ html body #root [role="columnheader"] {
     widows: 3;
   }
 }
+
+/* Sidebar refresh: university portal layout inspired by the supplied reference. */
+.asems-sidebar {
+  min-height: 100vh;
+  background: #f7f8fa;
+  border-right: 1px solid #cfd5df;
+}
+.asems-sidebar-brand {
+  border-bottom-color: #cfd5df;
+}
+.asems-sidebar-logo {
+  width: 100%;
+  max-width: 190px;
+}
+.asems-sidebar-menu-button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.asems-sidebar-heading {
+  letter-spacing: .01em;
+  margin-bottom: 8px;
+}
+.asems-sidebar-group {
+  min-height: 52px;
+  border-radius: 7px;
+}
+.asems-sidebar-group:hover,
+.asems-sidebar-settings:hover {
+  background: #eef1f5;
+}
+.asems-sidebar-group-label {
+  color: #263547;
+}
+.asems-sidebar-group > svg:last-child,
+.asems-sidebar-settings > svg:last-child {
+  color: #263547;
+}
+.asems-sidebar-nav a {
+  min-height: 42px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.asems-sidebar-nav a:hover {
+  background: #edf1f5;
+}
+.asems-sidebar-nav a[aria-current="page"] {
+  background: #e9eef3;
+  color: #182b40;
+}
+.asems-sidebar-footer > div {
+  background: #fff;
+}
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-logo,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-heading,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-group-label > span,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-group > svg:last-child,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-settings-label,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-settings > svg:last-child,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-footer {
+  display: none;
+}
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-brand {
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-group,
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-settings {
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-group-label {
+  justify-content: center;
+}
+.asems-sidebar.lg\:w-\[88px\] .asems-sidebar-nav section > div {
+  display: none;
+}
+html[data-theme="dark"] .asems-sidebar {
+  background: #142522;
+  border-right-color: #2c453d;
+}
+html[data-theme="dark"] .asems-sidebar-brand {
+  background: #142522;
+  border-bottom-color: #2c453d;
+}
+html[data-theme="dark"] .asems-sidebar-heading {
+  color: #a0b4ab;
+}
+html[data-theme="dark"] .asems-sidebar-group-label,
+html[data-theme="dark"] .asems-sidebar-group > svg:last-child,
+html[data-theme="dark"] .asems-sidebar-settings > svg:last-child {
+  color: #edf5f1;
+}
+html[data-theme="dark"] .asems-sidebar-group:hover,
+html[data-theme="dark"] .asems-sidebar-settings:hover,
+html[data-theme="dark"] .asems-sidebar-nav a:hover,
+html[data-theme="dark"] .asems-sidebar-nav a[aria-current="page"] {
+  background: #1b322d;
+  color: #edf5f1;
+}
+html[data-theme="dark"] .asems-sidebar-footer {
+  border-top-color: #2c453d;
+}
+html[data-theme="dark"] .asems-sidebar-footer > div {
+  background: #10201d;
+  border-color: #2c453d;
+}
+@media (max-width: 1023px) {
+  .asems-sidebar {
+    width: min(344px, 88vw);
+  }
+}

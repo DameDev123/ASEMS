@@ -505,6 +505,7 @@ function groupContainsPath(group, pathname) {
 
 export default function AppLayout({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const navigationGroups = getNavigationGroups(user?.role);
@@ -564,44 +565,44 @@ export default function AppLayout({ user, onLogout }) {
 
       {/* SIDEBAR */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-max max-w-[85vw] flex-col border-r border-slate-200 bg-white text-slate-900 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
+        className={`asems-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(344px,88vw)] flex-col border-r border-slate-200 bg-slate-50 text-slate-900 transition-all duration-200 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
+          sidebarCollapsed ? 'lg:w-[88px]' : 'lg:w-[288px]'
         }`}
       >
-        {/* LOGO */}
-        <div className="flex h-[78px] shrink-0 items-center gap-3 border-b border-slate-200 px-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200">
-            <img
-              src="/mylogo.png"
-              alt="Ambo University Logo"
-              className="h-full w-full rounded-full object-contain"
-            />
-          </div>
-
-          <div>
-            <div className="text-lg font-semibold tracking-wide">
-              AAPEMS
-            </div>
-            <div className="text-[11px] text-slate-500">
-              AMBO UNIVERSITY
-            </div>
-          </div>
-
+        {/* UNIVERSITY BRAND HEADER */}
+        <div className="asems-sidebar-brand flex h-[98px] shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4">
+          <img
+            src="/mylogo.png"
+            alt="Ambo University"
+            className="asems-sidebar-logo h-[76px] min-w-0 max-w-[218px] flex-1 object-contain object-left"
+          />
           <button
             type="button"
-            aria-label="Close navigation"
-            className="ml-auto rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
-            onClick={() => setMobileOpen(false)}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="asems-sidebar-menu-button shrink-0 rounded-md p-2 text-slate-700 transition hover:bg-slate-100"
+            onClick={() => {
+              if (window.matchMedia('(min-width: 1024px)').matches) {
+                setSidebarCollapsed((collapsed) => !collapsed);
+              } else {
+                setMobileOpen(false);
+              }
+            }}
           >
-            <X size={18} />
+            <Menu size={22} strokeWidth={2.2} />
           </button>
         </div>
 
         {/* NAVIGATION */}
         <nav
-          className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-2 py-4"
+          className="asems-sidebar-nav scrollbar-thin flex-1 space-y-2 overflow-y-auto px-3 py-4"
           aria-label="Main navigation"
         >
+          <div className="asems-sidebar-heading px-2 pb-2 text-[15px] font-medium text-slate-500">
+            Main Menu
+          </div>
           {navigationGroups.map((group, index) => {
             const isOpen = Boolean(openGroups[group.label]);
             const panelId = `nav-group-${index}`;
@@ -614,14 +615,15 @@ export default function AppLayout({ user, onLogout }) {
                   onClick={() => toggleGroup(group.label)}
                   aria-expanded={isOpen}
                   aria-controls={panelId}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-100 ${
+                  className={`asems-sidebar-group flex w-full items-center justify-between rounded-lg px-3 py-3 text-left transition hover:bg-white ${
                     isOpen
                       ? 'text-slate-900'
                       : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
-                  <span className="text-[11px] font-semibold tracking-[0.16em]">
-                    {group.label}
+                  <span className="asems-sidebar-group-label flex min-w-0 items-center gap-3 text-[16px] font-semibold">
+                    <GraduationCap size={21} strokeWidth={2} className="shrink-0 text-slate-700" />
+                    <span className="truncate">{group.label.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</span>
                   </span>
 
                   <ChevronRight
@@ -679,22 +681,23 @@ export default function AppLayout({ user, onLogout }) {
             to="/settings"
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
-              `flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition ${
+              `asems-sidebar-settings flex w-full items-center justify-between rounded-lg px-3 py-3 transition ${
                 isActive
                   ? 'bg-slate-100 text-slate-900'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
               }`
             }
           >
-            { <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+            <span className="asems-sidebar-settings-label flex items-center gap-3 text-[16px] font-semibold">
+              <Settings size={20} aria-hidden="true" className="shrink-0" />
               Settings
-            </span> }
-            <Settings size={15} aria-hidden="true" className="shrink-0" />
+            </span>
+            <ChevronRight size={17} aria-hidden="true" className="shrink-0" />
           </NavLink>
         </nav>
 
         {/* SIDEBAR FOOTER */}
-        <div className="shrink-0 border-t border-slate-200 p-3">
+        <div className="asems-sidebar-footer shrink-0 border-t border-slate-200 p-3">
           <div className="w-0 min-w-full rounded-xl border border-slate-200 p-3">
             <div className="flex items-center gap-2 text-xs font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
