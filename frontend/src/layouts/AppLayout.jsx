@@ -11,12 +11,12 @@ import {
   CalendarDays,
   Archive,
   ChartNoAxesCombined,
-  ChevronDown,
   ChevronRight,
   ClipboardCheck,
   ClipboardList,
   FileText,
   GraduationCap,
+  Home,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -482,9 +482,18 @@ const myAdminEvaluationsGroup = {
 function getNavigationGroups(role) {
   const groups = getBaseNavigationGroups(role);
 
-  return ADMIN_EVALUATION_WORKSPACE_ROLES.has(role)
+  const allGroups = ADMIN_EVALUATION_WORKSPACE_ROLES.has(role)
     ? [...groups, myAdminEvaluationsGroup]
     : groups;
+
+  // Dashboard is opened from the top bar, so the sidebar no longer lists it
+  // (a group that only held the Dashboard disappears with it).
+  return allGroups
+    .map((group) => ({
+      ...group,
+      items: (group.items || []).filter((item) => item.to !== '/'),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 /* =========================================================
@@ -534,6 +543,15 @@ export default function AppLayout({ user, onLogout }) {
     }
   }, [pathname, user?.role]);
 
+  // Top-bar menu button: collapse/expand the sidebar on desktop, open the drawer on small screens.
+  function toggleSidebar() {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      setSidebarCollapsed((collapsed) => !collapsed);
+    } else {
+      setMobileOpen(true);
+    }
+  }
+
   function toggleGroup(label) {
     setOpenGroups((current) =>
       current[label] ? {} : { [label]: true },
@@ -552,6 +570,38 @@ export default function AppLayout({ user, onLogout }) {
 
   return (
     <div className="asems-app-shell min-h-screen bg-slate-50 text-slate-900 lg:flex">
+      <style>{`
+        /* Top bar and sidebar colours of the university portal (light theme).
+           The app forces transparent borders (index.css), so the thin portal lines are set explicitly here. */
+        html[data-theme='light'] body #root .asems-header.asems-topbar {
+          background-color: #ffffff;
+          color: #333333;
+          border-bottom: 1px solid #d2d6de !important;
+          border-bottom-color: #d2d6de !important;
+        }
+        html[data-theme='light'] body #root .asems-sidebar {
+          background-color: #f9fafc;
+          border-right: 1px solid #d2d6de !important;
+          border-right-color: #d2d6de !important;
+        }
+        html[data-theme='light'] body #root .asems-sidebar-brand {
+          background-color: #ffffff;
+          border-bottom: 1px solid #d2d6de !important;
+          border-bottom-color: #d2d6de !important;
+        }
+        html[data-theme='light'] .asems-sidebar .asems-sidebar-group,
+        html[data-theme='light'] .asems-sidebar .asems-sidebar-nav a {
+          color: #444444;
+        }
+        .asems-topbar-icon,
+        .asems-topbar-link,
+        .asems-topbar-welcome { color: inherit; }
+        html[data-theme='light'] .asems-topbar .asems-topbar-link:hover,
+        html[data-theme='light'] .asems-topbar .asems-topbar-icon:hover { color: #3c8dbc; }
+        html[data-theme='dark'] .asems-topbar .asems-topbar-link:hover,
+        html[data-theme='dark'] .asems-topbar .asems-topbar-icon:hover { color: #ffcb3d; }
+      `}</style>
+
 
       {/* MOBILE OVERLAY */}
       {mobileOpen && (
@@ -572,27 +622,12 @@ export default function AppLayout({ user, onLogout }) {
         }`}
       >
         {/* UNIVERSITY BRAND HEADER */}
-        <div className="asems-sidebar-brand flex h-[98px] shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4">
+        <div className="asems-sidebar-brand flex h-[96px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4">
           <img
             src="/mylogo.png"
             alt="Ambo University"
             className="asems-sidebar-logo h-[76px] min-w-0 max-w-[218px] flex-1 object-contain object-left"
           />
-          <button
-            type="button"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="asems-sidebar-menu-button shrink-0 rounded-md p-2 text-slate-700 transition hover:bg-slate-100"
-            onClick={() => {
-              if (window.matchMedia('(min-width: 1024px)').matches) {
-                setSidebarCollapsed((collapsed) => !collapsed);
-              } else {
-                setMobileOpen(false);
-              }
-            }}
-          >
-            <Menu size={22} strokeWidth={2.2} />
-          </button>
         </div>
 
         {/* NAVIGATION */}
@@ -675,123 +710,80 @@ export default function AppLayout({ user, onLogout }) {
               </section>
             );
           })}
-
-          {/* SETTINGS */}
-          <NavLink
-            to="/settings"
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `asems-sidebar-settings flex w-full items-center justify-between rounded-lg px-3 py-3 transition ${
-                isActive
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-              }`
-            }
-          >
-            <span className="asems-sidebar-settings-label flex items-center gap-3 text-[16px] font-semibold">
-              <Settings size={20} aria-hidden="true" className="shrink-0" />
-              Settings
-            </span>
-            <ChevronRight size={17} aria-hidden="true" className="shrink-0" />
-          </NavLink>
         </nav>
-
-        {/* SIDEBAR FOOTER */}
-        <div className="asems-sidebar-footer shrink-0 border-t border-slate-200 p-3">
-          <div className="w-0 min-w-full rounded-xl border border-slate-200 p-3">
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              AAPEMS workspace
-            </div>
-            <p className="mt-1 text-[11px] leading-5 text-slate-500">
-              Academic evaluation and reporting
-            </p>
-          </div>
-        </div>
       </aside>
 
       {/* MAIN CONTENT */}
       <div className="min-h-screen min-w-0 flex-1">
 
         {/* HEADER */}
-        <header className="asems-header sticky top-0 z-20 flex h-[78px] items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7">
+        <header className="asems-header asems-topbar sticky top-0 z-20 flex h-[96px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-7">
 
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              className="icon-button lg:hidden"
-              aria-label="Open navigation"
-              onClick={() => setMobileOpen(true)}
+              className="asems-topbar-icon shrink-0 rounded-md p-2 transition"
+              aria-label="Toggle navigation"
+              title="Toggle navigation"
+              onClick={toggleSidebar}
             >
-              <Menu size={20} />
+              <Menu size={24} strokeWidth={2.6} />
             </button>
-
-            <div className="hidden text-sm text-slate-500 sm:block">
-              Academic Affairs
-              <span className="mx-2 text-slate-300">/</span>
-              <span className="font-medium text-slate-800">
-                Workspace
-              </span>
-            </div>
-
-            <div className="text-sm font-semibold sm:hidden">
-              AAPEMS
-            </div>
           </div>
 
           {/* HEADER ACTIONS */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            <NotificationBell />
-            <LanguageSwitcher />
-            <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-3 sm:gap-6">
+            <NavLink
+              to="/"
+              end
+              onClick={closeMenus}
+              className={({ isActive }) =>
+                `asems-topbar-link hidden items-center gap-2 text-[17px] transition sm:flex ${
+                  isActive ? 'font-semibold' : ''
+                }`
+              }
+            >
+              <Home size={22} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+              <span className="hidden md:inline">Dashboard</span>
+            </NavLink>
 
-            <div className="hidden text-right md:block">
-              <p className="text-xs font-medium text-slate-500">
-                Signed in as
-              </p>
-              <p className="text-sm font-semibold text-slate-800">
-                {formatRole(user?.role)}
+            <div className="flex items-center gap-1 sm:gap-2">
+              <NotificationBell />
+              <LanguageSwitcher />
+              <ThemeToggle />
+            </div>
+
+            {/* WELCOME */}
+            <div className="hidden min-w-0 items-center gap-3 md:flex">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy-900 text-sm font-semibold text-white">
+                {user?.profilePhoto ? (
+                  <img
+                    src={getAssetUrl(user.profilePhoto)}
+                    alt={`${user?.name || 'User'} profile`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  getInitials(user)
+                )}
+              </span>
+
+              <p className="asems-topbar-welcome hidden max-w-[420px] truncate text-[15px] 2xl:block">
+                Welcome {user?.name || 'ASEMS User'}, Signed in as:{' '}
+                <em className="font-bold underline">{formatRole(user?.role)}</em>
               </p>
             </div>
 
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-
-            {/* PROFILE */}
+            {/* SETTINGS / ACCOUNT MENU */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setProfileOpen((open) => !open)}
                 aria-expanded={profileOpen}
                 aria-label="Open user menu"
-                className="flex max-w-[220px] items-center gap-2 rounded-lg p-1.5 transition hover:bg-slate-50"
+                title="Account and settings"
+                className="asems-topbar-icon rounded-md p-2 transition"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy-900 text-sm font-semibold text-white">
-                  {user?.profilePhoto ? (
-                    <img
-                      src={getAssetUrl(user.profilePhoto)}
-                      alt={`${user?.name || 'User'} profile`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    getInitials(user)
-                  )}
-                </span>
-
-                <span className="hidden min-w-0 text-left sm:block">
-                  <span className="block max-w-36 truncate text-xs font-semibold text-slate-800">
-                    {user?.name || 'ASEMS User'}
-                  </span>
-                  <span className="block max-w-36 truncate text-[11px] text-slate-500">
-                    {formatRole(user?.role)}
-                  </span>
-                </span>
-
-                <ChevronDown
-                  size={14}
-                  className={`hidden shrink-0 text-slate-400 transition sm:block ${
-                    profileOpen ? 'rotate-180' : ''
-                  }`}
-                />
+                <Settings size={24} strokeWidth={2.4} />
               </button>
 
               {profileOpen && (
@@ -815,6 +807,15 @@ export default function AppLayout({ user, onLogout }) {
                         {formatRole(user?.role)}
                       </p>
                     </div>
+
+                    <NavLink
+                      to="/settings"
+                      onClick={closeMenus}
+                      className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                    >
+                      <Settings size={16} />
+                      Settings
+                    </NavLink>
 
                     <button
                       type="button"
