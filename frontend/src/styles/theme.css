@@ -1248,3 +1248,189 @@ html[data-theme="dark"] body #root textarea:focus {
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+/* ==========================================
+   ASEMS PORTAL PALETTE — LIGHT THEME
+   Colours of the Ambo University student portal:
+   white page, #f9fafc sidebar, #333 text, #3c8dbc blue accent, #d2d6de lines.
+   Dark theme is not touched. Keep this block at the very end of theme.css.
+   ========================================== */
+
+/* Page and text */
+html[data-theme="light"],
+html[data-theme="light"] body,
+html[data-theme="light"] #root,
+html[data-theme="light"] body #root .asems-app-shell {
+  background-color: #ffffff;
+  color: #333333;
+}
+
+html[data-theme="light"] body #root .asems-surface,
+html[data-theme="light"] body #root .asems-themed-card,
+html[data-theme="light"] body #root .asems-stat-card,
+html[data-theme="light"] body #root .asems-dashboard-panel,
+html[data-theme="light"] body #root .panel-card {
+  background-color: #ffffff;
+  color: #333333;
+  border-color: #d2d6de;
+}
+
+html[data-theme="light"] body #root .asems-app-shell :is(
+  .asems-text-primary,
+  .text-slate-950,
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700,
+  .text-gray-900,
+  .text-gray-800
+) {
+  color: #333333;
+}
+
+html[data-theme="light"] body #root .asems-app-shell :is(
+  .asems-muted,
+  .asems-table-secondary,
+  .text-slate-600,
+  .text-slate-500,
+  .text-gray-600,
+  .text-gray-500
+) {
+  color: #777777;
+}
+
+/* Light surfaces */
+html[data-theme="light"] body #root .asems-app-shell :is(.bg-slate-50, .bg-slate-50\/70, .bg-gray-50) {
+  background-color: #f9fafc;
+}
+
+html[data-theme="light"] body #root .asems-app-shell :is(.bg-slate-100, .bg-gray-100) {
+  background-color: #f4f4f4;
+}
+
+/* Blue accent: primary buttons, links, active markers */
+html[data-theme="light"] body #root :is(.bg-navy-900, .bg-navy-800, .bg-blue-700, .bg-blue-800) {
+  background-color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root .bg-slate-900:not(pre),
+html[data-theme="light"] body #root .primary-button {
+  background-color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root .primary-button:hover {
+  background-color: #367fa9;
+}
+
+html[data-theme="light"] body #root .primary-button:focus-visible {
+  --tw-ring-color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root :is(
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-slate-700:hover,
+  .hover\:bg-navy-800:hover,
+  .hover\:bg-blue-800:hover
+) {
+  background-color: #367fa9;
+}
+
+html[data-theme="light"] body #root :is(.text-navy-800, .text-navy-900) {
+  color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root :is(.bg-gold-400, .bg-gold-500, .before\:bg-gold-400::before) {
+  background-color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root .text-gold-700 {
+  color: #367fa9;
+}
+
+html[data-theme="light"] body #root .asems-dashboard-link {
+  color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root .asems-dashboard-link:hover {
+  color: #367fa9;
+}
+
+html[data-theme="light"] body #root .asems-progress-fill {
+  background-color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root .asems-progress-track {
+  background-color: #e5e5e5;
+}
+
+/* Tables */
+html[data-theme="light"] body #root .asems-dashboard-table {
+  background-color: #ffffff;
+  color: #333333;
+}
+
+html[data-theme="light"] body #root .asems-dashboard-table thead,
+html[data-theme="light"] body #root .asems-dashboard-table th {
+  background-color: #f9fafc;
+  color: #333333;
+}
+
+html[data-theme="light"] body #root .asems-dashboard-table tbody tr:hover {
+  background-color: #f4f4f4;
+}
+
+/* Secondary buttons and the profile / theme controls */
+html[data-theme="light"] body #root .asems-secondary-button,
+html[data-theme="light"] body #root .asems-theme-toggle {
+  background-color: #ffffff;
+  color: #333333;
+  border-color: #d2d6de;
+}
+
+html[data-theme="light"] body #root .asems-secondary-button:hover,
+html[data-theme="light"] body #root .asems-theme-toggle:hover,
+html[data-theme="light"] body #root .asems-profile-trigger:hover {
+  background-color: #f4f4f4;
+}
+
+/* Form fields: grey border, blue when focused (replaces the green outline) */
+html[data-theme="light"] body #root input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]),
+html[data-theme="light"] body #root select,
+html[data-theme="light"] body #root textarea {
+  background-color: #ffffff;
+  color: #333333;
+  border-color: #d2d6de !important;
+}
+
+html[data-theme="light"] body #root input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):focus,
+html[data-theme="light"] body #root select:focus,
+html[data-theme="light"] body #root textarea:focus {
+  border-color: #3c8dbc !important;
+  outline: none;
+}
+
+html[data-theme="light"] body #root .asems-app-shell input::placeholder,
+html[data-theme="light"] body #root .asems-app-shell textarea::placeholder {
+  color: #777777;
+}
+
+/* Tabs like the portal: blue links, the open tab in grey text on white */
+html[data-theme="light"] body #root .asems-app-shell [role="tablist"] {
+  border-bottom: 1px solid #dddddd !important;
+  border-bottom-color: #dddddd !important;
+}
+
+html[data-theme="light"] body #root .asems-app-shell [role="tablist"] [role="tab"] {
+  color: #3c8dbc;
+}
+
+html[data-theme="light"] body #root .asems-app-shell [role="tablist"] [role="tab"]:hover {
+  color: #367fa9;
+}
+
+html[data-theme="light"] body #root .asems-app-shell [role="tablist"] [role="tab"][aria-selected="true"] {
+  color: #555555;
+  background-color: #ffffff;
+  border: 1px solid #dddddd !important;
+  border-bottom-color: #ffffff !important;
+  border-radius: 4px 4px 0 0;
+}

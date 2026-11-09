@@ -590,9 +590,12 @@ export default function AppLayout({ user, onLogout }) {
           border-bottom-color: #d2d6de !important;
         }
         html[data-theme='light'] .asems-sidebar .asems-sidebar-group,
+        html[data-theme='light'] .asems-sidebar .asems-sidebar-group svg,
         html[data-theme='light'] .asems-sidebar .asems-sidebar-nav a {
           color: #444444;
         }
+        html[data-theme='light'] .asems-sidebar .asems-sidebar-abbr { color: #333333; }
+        html[data-theme='dark'] .asems-sidebar .asems-sidebar-abbr { color: #edf5f1; }
         .asems-topbar-icon,
         .asems-topbar-link,
         .asems-topbar-welcome { color: inherit; }
@@ -622,12 +625,28 @@ export default function AppLayout({ user, onLogout }) {
         }`}
       >
         {/* UNIVERSITY BRAND HEADER */}
-        <div className="asems-sidebar-brand flex h-[96px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4">
+        <div
+          className={`asems-sidebar-brand flex h-[96px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 ${
+            sidebarCollapsed ? 'lg:justify-center lg:px-1' : ''
+          }`}
+        >
           <img
             src="/mylogo.png"
             alt="Ambo University"
-            className="asems-sidebar-logo h-[76px] min-w-0 max-w-[218px] flex-1 object-contain object-left"
+            className={`asems-sidebar-logo h-[76px] min-w-0 max-w-[218px] flex-1 object-contain object-left ${
+              sidebarCollapsed ? 'lg:hidden' : ''
+            }`}
           />
+
+          {/* Minimised sidebar: the short name takes the place of the logo. */}
+          <span
+            title="AAPEMS"
+            className={`asems-sidebar-abbr hidden text-center text-[15px] font-bold tracking-tight ${
+              sidebarCollapsed ? 'lg:block' : ''
+            }`}
+          >
+            AAPEMS
+          </span>
         </div>
 
         {/* NAVIGATION */}

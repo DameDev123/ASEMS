@@ -1,44 +1,61 @@
-
 import { useState } from 'react';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import {
-  ArrowRight,
   Eye,
   EyeOff,
-  LockKeyhole,
-  ShieldCheck,
+  Lock,
   LoaderCircle,
+  Mail,
   User,
 } from 'lucide-react';
 import { loginRequest } from '../services/api.js';
 
-function Brand() {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/10 overflow-hidden">
-        <img
-          src="/mylogo.png"
-          alt="Ambo University Logo"
-          className="h-9 w-9 rounded-full object-cover"
-        />
-      </span>
+// Same selector shape as the global form-field rule in theme.css, so these fields can override it.
+const FIELD =
+  'input.asems-portal-input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"])';
 
-      <span className="min-w-0">
-        <span className="block text-xl font-extrabold tracking-wide text-white">
-          AAPEMS
-        </span>
+// Colours of the Ambo University portal login page.
+// The app forces transparent borders and green focus outlines (theme.css), so the field borders are set explicitly here.
+const PORTAL_LOGIN_CSS = `
+  .asems-portal-login { background-color: #ffffff; color: #333333; }
+  .asems-portal-login .asems-portal-link { color: #3c8dbc; }
+  .asems-portal-login .asems-portal-link:hover { color: #367fa9; }
+  .asems-portal-login .asems-portal-avatar,
+  .asems-portal-login .asems-portal-icon { color: #777777; }
+  .asems-portal-login .asems-portal-note { color: #555555; }
 
-        <span className="block text-xs font-semibold text-slate-200">
-          Ambo University
-        </span>
+  html body #root .asems-portal-login ${FIELD} {
+    background-color: #e8f0fe;
+    color: #000000;
+    border: 1px solid #d2d6de !important;
+    border-color: #d2d6de !important;
+  }
+  html body #root .asems-portal-login ${FIELD}:focus {
+    border-color: #3c8dbc !important;
+    outline: none;
+  }
+  html body #root .asems-portal-login .asems-portal-foot {
+    border-top: 1px solid #d2d6de !important;
+    border-top-color: #d2d6de !important;
+  }
 
-        <span className="mt-0.5 block text-[11px] text-slate-400">
-          Academic and Administrative Performance Evaluation Management System.
-        </span>
-      </span>
-    </div>
-  );
-}
+  html[data-theme='dark'] .asems-portal-login { background-color: #0c1917; color: #edf5f1; }
+  html[data-theme='dark'] .asems-portal-login .asems-portal-avatar,
+  html[data-theme='dark'] .asems-portal-login .asems-portal-icon { color: #9fb3ac; }
+  html[data-theme='dark'] .asems-portal-login .asems-portal-note { color: #b8cbc4; }
+  html[data-theme='dark'] .asems-portal-login .asems-portal-link { color: #6cb4dd; }
+  html[data-theme='dark'] body #root .asems-portal-login ${FIELD} {
+    background-color: #10201d;
+    color: #edf5f1;
+    border-color: #38554a !important;
+  }
+  html[data-theme='dark'] body #root .asems-portal-login ${FIELD}:focus {
+    border-color: #6cb4dd !important;
+  }
+  html[data-theme='dark'] body #root .asems-portal-login .asems-portal-foot {
+    border-top-color: #2c453d !important;
+  }
+`;
 
 export default function LoginPage({ user, onLogin }) {
   const location = useLocation();
@@ -83,183 +100,169 @@ export default function LoginPage({ user, onLogin }) {
   }
 
   return (
-    <main className="asems-login-page min-h-screen bg-slate-50 px-4 pb-12 text-slate-900 sm:px-6">
-      <header className="asems-login-topbar sticky top-0 z-50 mx-auto flex min-h-[78px] w-full max-w-7xl items-center justify-between gap-4 rounded-b-xl bg-[#101827] px-4 py-4 text-white shadow-lg sm:px-7">
-        <Brand />
+    <main className="asems-login-page asems-portal-login flex min-h-screen flex-col">
+      <style>{PORTAL_LOGIN_CSS}</style>
 
-        <nav
-          className="flex shrink-0 items-center gap-2 sm:gap-4"
-          aria-label="Login navigation"
+      {/* LOGO */}
+      <div className="flex items-start justify-between gap-4 px-5 pt-3 sm:px-8">
+        <img
+          src="/mylogo.png"
+          alt="Ambo University"
+          className="h-[80px] w-auto max-w-[60vw] object-contain object-left"
+        />
+
+        <Link
+          to="/"
+          className="asems-portal-link mt-3 rounded px-2 py-1 text-[17px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3c8dbc]"
         >
-          <Link
-            to="/"
-            className="asems-landing-nav-link rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold transition hover:border-emerald-300/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+          Home
+        </Link>
+      </div>
+
+      {/* MESSAGE BAR */}
+      {error && (
+        <div
+          id="login-error"
+          role="alert"
+          aria-live="polite"
+          className="mt-8 flex items-center justify-between gap-4 bg-[#dd4b39] px-6 py-5 text-[17px] text-white"
+        >
+          <p>{error}</p>
+
+          <button
+            type="button"
+            onClick={() => setError('')}
+            aria-label="Dismiss message"
+            className="shrink-0 text-2xl leading-none opacity-70 transition hover:opacity-100"
           >
-            Home
-          </Link>
-        </nav>
-      </header>
+            ×
+          </button>
+        </div>
+      )}
 
-      <div className="mx-auto mt-12 w-full max-w-md sm:mt-16">
-        <section className="asems-login-card overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_28px_80px_-35px_rgba(15,23,42,0.3)]">
-          <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-sky-400" />
+      {/* LOGIN */}
+      <div className="mx-auto mt-12 w-full max-w-[780px] flex-1 px-6 pb-16 sm:mt-16">
+        {selectedRole && (
+          <p className="asems-portal-note mb-5 text-sm">
+            Access category: <strong>{selectedRole}</strong>
+          </p>
+        )}
 
-          <div className="asems-login-form-panel p-6 sm:p-9">
-            <div className="mb-8 flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                <ShieldCheck size={24} aria-hidden="true" />
-              </span>
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-10">
+          <User
+            size={104}
+            fill="currentColor"
+            strokeWidth={1.2}
+            aria-hidden="true"
+            className="asems-portal-avatar shrink-0"
+          />
 
-              <div>
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-950">
-                  Account sign in
-                </h1>
+          <form onSubmit={handleSubmit} className="w-full min-w-0 flex-1 space-y-4">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Username
+              </label>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  Authorized university access
-                </p>
+              <div className="relative">
+                <input
+                  id="email"
+                  name="email"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoFocus
+                  required
+                  maxLength={255}
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
 
-                {selectedRole && (
-                  <p className="mt-2 inline-flex max-w-full rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                    Access category: {selectedRole}
-                  </p>
-                )}
+                    if (error) {
+                      setError('');
+                    }
+                  }}
+                  placeholder="Enter your username"
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'login-error' : undefined}
+                  className="asems-portal-input h-[51px] w-full rounded-[3px] pl-4 pr-12 text-[17px] placeholder:text-[#777777]"
+                />
+
+                <Mail
+                  size={20}
+                  fill="currentColor"
+                  stroke="#e8f0fe"
+                  aria-hidden="true"
+                  className="asems-portal-icon pointer-events-none absolute right-4 top-1/2 -translate-y-1/2"
+                />
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  Username
-                </label>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
 
-                <div className="group relative">
-                  <User
-                    size={18}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600"
-                  />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  maxLength={128}
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
 
-                  <input
-                    id="email"
-                    name="email"
-                    type="text"
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    autoFocus
-                    required
-                    maxLength={255}
-                    value={email}
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-
-                      if (error) {
-                        setError('');
-                      }
-                    }}
-                    placeholder="Enter your username"
-                    aria-invalid={Boolean(error)}
-                    aria-describedby={
-                      error ? 'login-error' : undefined
+                    if (error) {
+                      setError('');
                     }
-                    className="h-[3.25rem] w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
+                  }}
+                  placeholder="Enter your password"
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'login-error' : undefined}
+                  className="asems-portal-input h-[51px] w-full rounded-[3px] pl-4 pr-[5.5rem] text-[17px] placeholder:text-[#777777]"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="asems-portal-icon absolute right-11 top-1/2 -translate-y-1/2 rounded p-1.5 transition hover:text-[#3c8dbc] focus-visible:ring-2 focus-visible:ring-[#3c8dbc]"
+                >
+                  {showPassword ? (
+                    <EyeOff size={18} aria-hidden="true" />
+                  ) : (
+                    <Eye size={18} aria-hidden="true" />
+                  )}
+                </button>
+
+                <Lock
+                  size={20}
+                  fill="currentColor"
+                  aria-hidden="true"
+                  className="asems-portal-icon pointer-events-none absolute right-4 top-1/2 -translate-y-1/2"
+                />
               </div>
+            </div>
 
-              <div>
-                <label
-                  htmlFor="password"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  Password
-                </label>
+            {isStudent && (
+              <p className="asems-portal-note text-sm leading-6">
+                Your username is your Student ID. Sign in with it and the
+                initial password given to you by the university. Passwords
+                cannot be changed here. If you lost yours, contact the system
+                administrator.
+              </p>
+            )}
 
-                <div className="group relative">
-                  <LockKeyhole
-                    size={18}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600"
-                  />
-
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    maxLength={128}
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value);
-
-                      if (error) {
-                        setError('');
-                      }
-                    }}
-                    placeholder="Enter your password"
-                    aria-invalid={Boolean(error)}
-                    aria-describedby={
-                      error ? 'login-error' : undefined
-                    }
-                    className="h-[3.25rem] w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-11 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowPassword((visible) => !visible)
-                    }
-                    aria-label={
-                      showPassword ? 'Hide password' : 'Show password'
-                    }
-                    aria-pressed={showPassword}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-emerald-500"
-                  >
-                    {showPassword ? (
-                      <EyeOff size={18} aria-hidden="true" />
-                    ) : (
-                      <Eye size={18} aria-hidden="true" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {isStudent && (
-                <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
-                  Your username is your Student ID. Sign in with it and the
-                  initial password given to you by the university. Passwords
-                  cannot be changed here. If you lost yours, contact the system
-                  administrator.
-                </p>
-              )}
-
-              {error && (
-                <div
-                  id="login-error"
-                  role="alert"
-                  aria-live="polite"
-                  className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
-                >
-                  <ShieldCheck
-                    size={17}
-                    className="mt-0.5 shrink-0"
-                    aria-hidden="true"
-                  />
-
-                  <p>{error}</p>
-                </div>
-              )}
-
+            <div className="flex justify-center pt-3">
               <button
                 type="submit"
                 disabled={loading}
-                className="group flex h-[3.25rem] w-full items-center justify-center gap-2 rounded-xl bg-[#101827] px-4 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 focus-visible:ring-4 focus-visible:ring-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-[47px] min-w-[145px] items-center justify-center gap-2 rounded-[3px] bg-[#3c8dbc] px-8 text-[17px] text-white transition hover:bg-[#367fa9] focus-visible:ring-4 focus-visible:ring-[#3c8dbc]/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? (
                   <>
@@ -271,24 +274,17 @@ export default function LoginPage({ user, onLogin }) {
                     <span>Signing in...</span>
                   </>
                 ) : (
-                  <>
-                    <span>Sign in</span>
-                    <ArrowRight
-                      size={17}
-                      className="transition-transform group-hover:translate-x-1"
-                      aria-hidden="true"
-                    />
-                  </>
+                  <span>Login</span>
                 )}
               </button>
-            </form>
-          </div>
-        </section>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          AAPEMS · Ambo University
-        </p>
+            </div>
+          </form>
+        </div>
       </div>
+
+      <p className="asems-portal-foot asems-portal-note py-4 text-center text-xs">
+        AAPEMS · Ambo University
+      </p>
     </main>
   );
 }
