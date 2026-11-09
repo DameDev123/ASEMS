@@ -36,7 +36,7 @@ import FormsPage from './pages/FormsPage.jsx';
 import CoursesPage from './pages/CoursesPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
 
-// Administrative Staff Evaluation pages (six-month evaluation form).
+// Administrative staff pages (six-month evaluation form).
 import {
   AdminEvaluationDashboard,
   AdminEvaluationPeriodsPage,
@@ -256,7 +256,7 @@ export default function App() {
           />
         ))}
 
-        {/* Administrative Staff Evaluation - administrators */}
+        {/* Administrative staff - administrators */}
         <Route
           path="admin-evaluations"
           element={<AdminEvaluationDashboard user={user} />}
@@ -278,7 +278,7 @@ export default function App() {
           element={<AdminEvaluationReportsPage user={user} />}
         />
 
-        {/* Administrative Staff Evaluation - employee and supervisor workspace */}
+        {/* Administrative staff - employee and supervisor workspace */}
         <Route
           path="my-admin-evaluations"
           element={<AdminEvaluationMinePage user={user} />}

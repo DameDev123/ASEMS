@@ -234,7 +234,7 @@ export default function UsersPage({ user }) {
       id_number: form.id_number.trim() || null,
       profile_photo: form.profile_photo.trim() || null,
       // Staff record. "administrative" makes the person appear in the
-      // Administrative Staff Evaluation > Employee assignments screen.
+      // Administrative staff > Employee assignments screen.
       employeeType:
         form.role === 'student' ? null : form.employeeType || null,
       departmentId: form.departmentId ? Number(form.departmentId) : null,
